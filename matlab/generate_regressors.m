@@ -5,11 +5,11 @@
 
 %% define parameters
 
-BHV_RAW_PATH = 'C:\behavior_raw_directory'; % directory of behavioral raw data (mat)
-BHV_FILE_PATH = 'C:\behavior_directory'; % directory of behavioral data (mat)
+IN_PATH_BHV_RAW = 'C:\behavior_raw_directory'; % directory of behavioral raw data (mat)
+IN_PATH_BHV = 'C:\behavior_directory'; % directory of behavioral data (mat)
 OUT_PATH = '../data/data_regressors/'; % directory to save regressor files (mat)
 
-data_dir = dir(BHV_RAW_PATH); data_dir(1:2) = [];
+data_dir = dir(IN_PATH_BHV_RAW); data_dir(1:2) = [];
 tmp_idx = arrayfun(@(num) isfolder(fullfile(data_dir(num).folder, data_dir(num).name)), 1:length(data_dir));
 data_dir(~tmp_idx) = []; 
 
@@ -17,7 +17,7 @@ sbj_date_list = cellfun(@(x) x(1:6), {data_dir.name}, 'UniformOutput', false); s
 sbj_num_list = cellfun(@(x) x(9:11), {data_dir.name}, 'UniformOutput', false); sbj_num_list(1) = [];
 sbj_num_array = cellfun(@(x) str2double(x), sbj_num_list);
 
-d = dir(BHV_FILE_PATH);
+d = dir(IN_PATH_BHV);
 file_names = {d.name};
 file_names = file_names(cellfun(@(x) contains(x, 'bhv'), file_names));
 sbj_list = cellfun(@(x) x(9:12), file_names, 'uni', 0); % ####: extracted from file name (bhvData_####.mat)
@@ -33,8 +33,8 @@ for sbj_i = 1:length(sbj_list)
     sbj_folder_name = [sbj_date_list{sbj_idx} '_A' sbj_num_list{sbj_idx}];
     bhv_file_name = [sbj_date_list{sbj_idx} '_sbj', sbj_num_list{sbj_idx}, '_WCDWWW.mat'];
 
-    if ~exist(fullfile(BHV_RAW_PATH, sbj_folder_name, bhv_file_name), 'file'); continue; end
-    load(fullfile(BHV_RAW_PATH, sbj_folder_name, bhv_file_name)); % 'Data'
+    if ~exist(fullfile(IN_PATH_BHV_RAW, sbj_folder_name, bhv_file_name), 'file'); continue; end
+    load(fullfile(IN_PATH_BHV_RAW, sbj_folder_name, bhv_file_name)); % 'Data'
 
     if isempty(Data); continue; end
     
@@ -43,7 +43,7 @@ for sbj_i = 1:length(sbj_list)
     
     trial_types = {'inst_enc_1', 'fix_enc_1', 'enc_1', 'inst_int_1', 'interfere_1', ... % 1~5
                    'inst_ret_1', 'fix_ret_1', 'ret_1', 'inst_enact_1', 'enact_1', ...   % 6~10
-                   'inst_enc_2', 'fix_enc_2', 'enc_2', 'inst_int_2', 'interfere_2', ...`% 11~15
+                   'inst_enc_2', 'fix_enc_2', 'enc_2', 'inst_int_2', 'interfere_2', ...   % 11~15
                    'inst_ret_2', 'fix_ret_2', 'ret_2', 'inst_enact_2', 'enact_2', ...   % 16~20
                    'ctrl_inst_enc', 'ctrl_fix_enc', 'ctrl_enc', 'ctrl_inst_ret', 'ctrl_fix_ret', 'ctrl_ret'}; % 21~26
     

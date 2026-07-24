@@ -36,7 +36,6 @@ roi_idx_list = {roi_idx_L, roi_idx_R, roi_idx_B};
 con_i = 2; % 2:control
 flag_i = 1; % 1:all
 
-group_idx = (eti_ea > 0);
 plot_color = [0.3 0.3 0.3; 223/255 153/255 153/255];
 %%%%%%%%%%%%%%%%
 
@@ -46,7 +45,8 @@ if fig_draw
     figure;
     set(gcf, 'Position', [100 100 420 150]);
 
-    tmp_category = categorical(group_idx, logical([0 1]), {'non-abused', 'abused'});
+    tmp_group = (eti_ea > 0);
+    tmp_category = categorical(tmp_group, logical([0 1]), {'non-abused', 'abused'});
 
     % - subfields -
     s_names = {'Ant', 'Post'};
@@ -505,21 +505,17 @@ end
 
 %% peak location: hippocampal activation peak along longitudinal axis (fig. 3e)
 
-roi_idx_L = [ 1 4 5 6 ]; % Hippocampus, head, body, tail
-roi_idx_R = [ 18 21 22 23 ];
-roi_idx_B = [ 35 38 39 40 ];
-HPC_IDX = {roi_idx_L, roi_idx_R, roi_idx_B};
+dir_beta = 'C:\freesurfer_directory_path'; % directory of FreeSurfer output files
 
-HEMI   = {'L', 'R', 'B'};
 N_HEMI = length(HEMI);
 
-PEAK_BW_MM = 8;  % Gaussian smoothing bandwidth (mm)
-
-peak_pos      = nan(num_sbj, N_HEMI); % normalized AP position via peak voxel (per hemisphere)
-peak_pos_comb = nan(num_sbj, 1);      % bilateral: L+R voxels pooled in normalized [0,1] space
-hpc_len_mm    = nan(num_sbj, N_HEMI); % hippocampal length (mm)
-hpc_nvox      = nan(num_sbj, N_HEMI); % hippocampal voxel count
-peak_beta     = nan(num_sbj, N_HEMI); % Gaussian-smoothed beta value at peak position
+peak_pos = nan(num_sbj, N_HEMI);   % normalized AP position via peak voxel
+peak_pos_A = nan(num_sbj, N_HEMI); % split-half A
+peak_pos_B = nan(num_sbj, N_HEMI);
+hpc_len_mm = nan(num_sbj, N_HEMI); % hippocampal length (mm)
+hpc_nvox   = nan(num_sbj, N_HEMI); % hippocampal voxel count
+peak_beta  = nan(num_sbj, N_HEMI); % Gaussian-smoothed beta value at peak position
+peak_pos_comb  = nan(num_sbj, 1);  % bilateral combined: L+R voxels pooled in [0,1] space
 
 for sbj_i = 1:num_sbj
     fprintf('[%d/%d] %s\n', sbj_i, num_sbj, sbj_list{sbj_i});
@@ -535,23 +531,27 @@ for sbj_i = 1:num_sbj
     n_trials = length(bdata.glm.beta);
 
     beta_all = accumulate_beta(bdata.glm.beta, 1:n_trials,  vol_size);
+    beta_A   = accumulate_beta(bdata.glm.beta, SPLIT_A,     vol_size);
+    beta_B   = accumulate_beta(bdata.glm.beta, SPLIT_B,     vol_size);
+
     if isempty(beta_all); continue; end
 
     %%% per hemisphere
-    proj_norm_tmp = {[], []};   % normalized [0,1] projections per hemisphere (L, R)
-    beta_tmp      = {[], []};   % beta values per hemisphere
+    proj_norm_tmp = {[], []};  % normalized [0,1] projections per hemisphere
+    beta_tmp      = {[], []};  % beta values per hemisphere
     bw_norm_tmp   = [nan, nan]; % normalized bandwidth per hemisphere
     for h = 1:N_HEMI
-        idx_hpc  = seg.sbj.seg_fit.hpc.big.roi_list_nn{HPC_IDX{h}(1)};
-        idx_head = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(2)};
-        idx_body = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(3)};
-        idx_tail = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(4)};
+        idx_hpc  = seg.sbj.seg_fit.hpc.big.roi_list_nn{HPC_IDX{h}};
+        idx_head = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HEAD_IDX{h}};
+        idx_body = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{BODY_IDX{h}};
+        idx_tail = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{TAIL_IDX{h}};
 
         if isempty(idx_hpc) || isempty(idx_head) || isempty(idx_body) || isempty(idx_tail); continue; end
 
         %%% voxel coords → mm  (row-vector: mm = [vx,vy,vz,1] * T)
         mm_hpc  = vox2mm(idx_hpc,  vol_size, T);  % N×3
         mm_head = vox2mm(idx_head, vol_size, T);
+        mm_body = vox2mm(idx_body, vol_size, T);
         mm_tail = vox2mm(idx_tail, vol_size, T);
 
         %%% PCA → long axis (1st principal component)
@@ -576,10 +576,16 @@ for sbj_i = 1:num_sbj
         bw_norm_tmp(h)   = PEAK_BW_MM / ax_range;
 
         %%% compute AP position for a given beta volume
-        [peak_pos(sbj_i, h), peak_beta(sbj_i, h)] = ap_peak(beta_all, idx_hpc, mm_hpc, ax, head_proj, ax_range, PEAK_BW_MM);
+        [peak_pos(sbj_i, h), peak_beta(sbj_i, h)] = ap_peak( beta_all, idx_hpc, mm_hpc, ax, head_proj, ax_range, PEAK_BW_MM);
+        if ~isempty(beta_A)
+            peak_pos_A(sbj_i, h)  = ap_peak( beta_A, idx_hpc, mm_hpc, ax, head_proj, ax_range, PEAK_BW_MM);
+        end
+        if ~isempty(beta_B)
+            peak_pos_B(sbj_i, h)  = ap_peak( beta_B, idx_hpc, mm_hpc, ax, head_proj, ax_range, PEAK_BW_MM);
+        end
     end
 
-    %%% bilateral combined: L+R voxels pooled in normalized [0,1] space
+    %%% Bilateral combined: L+R voxels pooled in normalized [0,1] space
     if ~isempty(proj_norm_tmp{1}) && ~isempty(proj_norm_tmp{2})
         proj_bil = [proj_norm_tmp{1}(:); proj_norm_tmp{2}(:)];
         beta_bil = [beta_tmp{1}(:);      beta_tmp{2}(:)];
@@ -588,43 +594,46 @@ for sbj_i = 1:num_sbj
     end
 end
 
-% bilateral (column 3): replace per-ROI peak with L+R pooled (combined) peak
-peak_pos(:, 3) = peak_pos_comb;
+peak_pos   = [peak_pos,   mean(peak_pos,   2, 'omitnan')];
+peak_pos_A = [peak_pos_A, mean(peak_pos_A, 2, 'omitnan')];
+peak_pos_B = [peak_pos_B, mean(peak_pos_B, 2, 'omitnan')];
 hpc_len_mm = [hpc_len_mm, mean(hpc_len_mm, 2, 'omitnan')];
 hpc_nvox   = [hpc_nvox,   mean(hpc_nvox,   2, 'omitnan')];
-peak_beta  = [peak_beta,  mean(peak_beta,  2, 'omitnan')];
+peak_beta   = [peak_beta,   mean(peak_beta,   2, 'omitnan')];
+HEMI   = {'L', 'R', 'B'};
 
 
 
 %% peak location: figures and stats
 
 
-% ---------- options ---------- %
+%%% ---- Options ----
 ap_data  = peak_pos;  ap_label = 'peak';
-h_plot   = 3;  % 1=L, 2=R, 3=bilateral
 
-group_idx    = (eti_ea > 0);
+h_plot = 3;  % 1=L, 2=R, 3=bilateral
+
 group_flag   = (eti_ea == 0)';
 group_names  = {'non-abused', 'abused'};
 group_colors = {[0.35 0.35 0.35], [0.78 0.25 0.25]};
-color1 = group_colors{1};
-color2 = group_colors{2};
 
-N_PERM = 5000;
+N_PERM = 5000;  
 
-% ---------- compute KDE & permutation test ---------- %
-ap     = ap_data(:, h_plot);
-valid  = ~isnan(ap);
-x_eval = linspace(0, 1, 300);
+%%% ---- Compute KDE & permutation test ----
+ap       = ap_data(:, h_plot);
+valid    = ~isnan(ap);
+x_eval   = linspace(0, 1, 300);
+c_g1 = group_colors{1};
+c_g2 = group_colors{2};
 
 g1_valid = valid &  group_flag(:);
 g2_valid = valid & ~group_flag(:);
 ap_g1    = ap(g1_valid);
 ap_g2    = ap(g2_valid);
 
-[~, ~, kde_bw] = ksdensity(ap(valid), x_eval, 'BoundaryCorrection', 'reflection');
-f_g1 = ksdensity(ap_g1, x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
-f_g2 = ksdensity(ap_g2, x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
+% 
+[f_all, ~, kde_bw] = ksdensity(ap(valid), x_eval, 'BoundaryCorrection', 'reflection');
+f_g1  = ksdensity(ap_g1, x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
+f_g2  = ksdensity(ap_g2, x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
 obs_diff = f_g1 - f_g2;
 
 % permutation
@@ -633,7 +642,7 @@ n1        = sum(g1_valid);
 perm_diff = zeros(N_PERM, length(x_eval));
 rng(42);
 for perm_i = 1:N_PERM
-    idx_shuf = randperm(length(ap_pooled));
+    idx_shuf  = randperm(length(ap_pooled));
     fp1 = ksdensity(ap_pooled(idx_shuf(1:n1)),     x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
     fp2 = ksdensity(ap_pooled(idx_shuf(n1+1:end)), x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
     perm_diff(perm_i, :) = fp1 - fp2;
@@ -643,7 +652,8 @@ end
 thr_pos_pw = prctile(perm_diff, 97.5, 1);
 thr_neg_pw = prctile(perm_diff,  2.5, 1);
 
-% cluster-based correction (cluster mass = sum of |diff| in cluster)
+% ── Cluster-based correction (cluster mass = sum of |diff| in cluster) ──
+% 
 max_mass_null = zeros(N_PERM, 1);
 for perm_i = 1:N_PERM
     d = perm_diff(perm_i, :);
@@ -659,7 +669,7 @@ for perm_i = 1:N_PERM
 end
 mass_thr = prctile(max_mass_null, 95);
 
-% significant clusters in the observed difference
+% 
 sig_pos = false(size(obs_diff));
 sig_neg = false(size(obs_diff));
 s = find(diff([false, obs_diff > thr_pos_pw]) == 1);
@@ -680,20 +690,21 @@ end
 sig_pos_sel = sig_pos;
 sig_neg_sel = sig_neg;
 
-% ---------- summary statistics ---------- %
+%%% ---- Summary statistics (Command Window) ----
 [~, p_tt, ~, stats_tt] = ttest2(ap_g1, ap_g2);
 fprintf('\n========== AP density group statistics [%s, %s HPC] ==========\n', ap_label, HEMI{h_plot});
 fprintf('%-6s  mean=%.3f  std=%.3f  N=%d\n', group_names{1}, mean(ap_g1), std(ap_g1), length(ap_g1));
 fprintf('%-6s  mean=%.3f  std=%.3f  N=%d\n', group_names{2}, mean(ap_g2), std(ap_g2), length(ap_g2));
 fprintf('t-test: t(%.0f)=%.3f  p=%.4f\n', stats_tt.df, stats_tt.tstat, p_tt);
 
-report_range = @(s, x) sprintf('%.3f-%.3f', min(x(s)), max(x(s)));
+report_range = @(s, x) sprintf('%.3f–%.3f', min(x(s)), max(x(s)));
 fprintf('[correction method: cluster]\n');
 for gi = 1:2
-    if gi == 1; sig_sel = sig_pos_sel; group1 = group_names{1}; group2 = group_names{2};
-    else;        sig_sel = sig_neg_sel; group1 = group_names{2}; group2 = group_names{1}; end
-    if any(sig_sel)
-        fprintf('%s > %s  (cluster): %s\n', group1, group2, report_range(sig_sel, x_eval));
+    if gi == 1; sp = sig_pos_sel; gn1 = group_names{1}; gn2 = group_names{2};
+    else;        sp = sig_neg_sel; gn1 = group_names{2}; gn2 = group_names{1};
+    end
+    if any(sp)
+        fprintf('%s > %s  (cluster): %s\n', gn1, gn2, report_range(sp, x_eval));
     end
 end
 if ~any(sig_pos_sel) && ~any(sig_neg_sel)
@@ -701,85 +712,85 @@ if ~any(sig_pos_sel) && ~any(sig_neg_sel)
 end
 
 
-% ---------- plot (density + dots) ---------- %
-figure;
-set(gcf, 'Position', [100 100 200 200]);
+% ---------- plot (density+dots) ---------- %
+    figure;
+    set(gcf, 'Position', [100 100 200 200]);
 
-% - density -
-ax1 = subplot('Position', [0.16 0.30 0.80 0.62]);
-hold(ax1, 'on');
+    % ─── density ───
+    ax1 = subplot('Position', [0.16 0.30 0.80 0.62]);
+    hold(ax1, 'on');
 
-y_max = max([f_g1, f_g2]) * 1.05;
+    y_max_c = max([f_g1, f_g2]) * 1.05;
 
-for tmp_k = 1:2
-    if tmp_k == 1; sig_mask = sig_pos_sel(:)';
-    else;           sig_mask = sig_neg_sel(:)'; end
-    sig_color = [1 0.75 0];
+    for tmp_k = 1:2
+        if tmp_k == 1; sig_mask = sig_pos_sel(:)'; sig_clr = c_g1;
+        else;           sig_mask = sig_neg_sel(:)'; sig_clr = c_g2; end
+        sig_clr = [1 0.75 0];
 
-    if ~any(sig_mask); continue; end
-    s_idx = find(diff([false, sig_mask]) == 1);
-    e_idx = find(diff([sig_mask, false]) == -1);
-    for k = 1:length(s_idx)
-        patch([x_eval(s_idx(k)) x_eval(e_idx(k)) x_eval(e_idx(k)) x_eval(s_idx(k))], ...
-            [0 0 y_max y_max], sig_color, ...
-            'FaceAlpha', 0.15, 'EdgeColor', 'none', 'Parent', ax1);
+        if ~any(sig_mask); continue; end
+        s_idx = find(diff([false, sig_mask]) == 1);
+        e_idx = find(diff([sig_mask, false]) == -1);
+        for k = 1:length(s_idx)
+            patch([x_eval(s_idx(k)) x_eval(e_idx(k)) x_eval(e_idx(k)) x_eval(s_idx(k))], ...
+                [0 0 y_max_c y_max_c], sig_clr, ...
+                'FaceAlpha', 0.15, 'EdgeColor', 'none', 'Parent', ax1);
+        end
     end
-end
 
-fill([x_eval, fliplr(x_eval)], [f_g1, zeros(1,length(x_eval))], color1, 'FaceAlpha', 0.35, 'EdgeColor', 'none');
-fill([x_eval, fliplr(x_eval)], [f_g2, zeros(1,length(x_eval))], color2, 'FaceAlpha', 0.35, 'EdgeColor', 'none');
-plot(x_eval, f_g1, 'Color', color1, 'LineWidth', 1.2);
-plot(x_eval, f_g2, 'Color', color2, 'LineWidth', 1.2);
+    fill([x_eval, fliplr(x_eval)], [f_g1, zeros(1,length(x_eval))], c_g1, 'FaceAlpha', 0.35, 'EdgeColor', 'none');
+    fill([x_eval, fliplr(x_eval)], [f_g2, zeros(1,length(x_eval))], c_g2, 'FaceAlpha', 0.35, 'EdgeColor', 'none');
+    plot(x_eval, f_g1, 'Color', c_g1, 'LineWidth', 1.2);
+    plot(x_eval, f_g2, 'Color', c_g2, 'LineWidth', 1.2);
 
-ylabel('Density');
-xlim([0 1]); ylim([0 y_max]);
-set(ax1, 'XTickLabel', {}, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold');
-box off;
+    ylabel('Density');
+    xlim([0 1]); ylim([0 y_max_c]);
+    set(ax1, 'XTickLabel', {}, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold');
+    box off;
 
-% - strip -
-ax2 = subplot('Position', [0.16 0.08 0.80 0.17]);
-hold(ax2, 'on');
+    % ─── strip ───
+    ax2 = subplot('Position', [0.16 0.08 0.80 0.17]);
+    hold(ax2, 'on');
 
-JITTER = 0.06;
-Y_G1   = 1.5;
-Y_G2   = 0.5;
+    JITTER_C = 0.06;
+    Y_G1_C   = 1.5;
+    Y_G2_C   = 0.5;
 
-rng(1);
-jitter1 = JITTER * randn(length(ap_g1), 1);
-jitter2 = JITTER * randn(length(ap_g2), 1);
-scatter(ap_g1, Y_G1 + jitter1, 6, color1, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
-scatter(ap_g2, Y_G2 + jitter2, 6, color2, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
+    rng(1);
+    jit1_c = JITTER_C * randn(length(ap_g1), 1);
+    jit2_c = JITTER_C * randn(length(ap_g2), 1);
+    scatter(ap_g1, Y_G1_C + jit1_c, 6, c_g1, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
+    scatter(ap_g2, Y_G2_C + jit2_c, 6, c_g2, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
 
-for gi = 1:2
-    if gi == 1; grp_data = ap_g1; color = color1; ym = Y_G1;
-    else;        grp_data = ap_g2; color = color2; ym = Y_G2; end
-    data_mean = mean(grp_data);
-    data_sem  = std(grp_data) / sqrt(length(grp_data));
-    plot([data_mean-data_sem, data_mean+data_sem], [ym, ym], '-', 'Color', color, 'LineWidth', 1.2);
-    plot([data_mean-data_sem, data_mean-data_sem], [ym-0.05, ym+0.05], '-', 'Color', color, 'LineWidth', 1.2);
-    plot([data_mean+data_sem, data_mean+data_sem], [ym-0.05, ym+0.05], '-', 'Color', color, 'LineWidth', 1.2);
-    scatter(data_mean, ym, 30, color, 'd', 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 1);
-end
+    for gi = 1:2
+        if gi == 1; d = ap_g1; clr = c_g1; ym = Y_G1_C;
+        else;        d = ap_g2; clr = c_g2; ym = Y_G2_C; end
+        m_c   = mean(d);
+        sem_c = std(d) / sqrt(length(d));
+        plot([m_c-sem_c, m_c+sem_c], [ym, ym], '-', 'Color', clr, 'LineWidth', 1.2);
+        plot([m_c-sem_c, m_c-sem_c], [ym-0.05, ym+0.05], '-', 'Color', clr, 'LineWidth', 1.2);
+        plot([m_c+sem_c, m_c+sem_c], [ym-0.05, ym+0.05], '-', 'Color', clr, 'LineWidth', 1.2);
+        scatter(m_c, ym, 30, clr, 'd', 'filled', 'MarkerEdgeColor', 'w', 'LineWidth', 1);
+    end
 
-xlim([0 1]);
-ylim([0.0 2.1]);
-yticks([Y_G2, Y_G1]);
-yticklabels({'', ''});
-set(ax2, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold', 'YDir', 'normal');
-box off;
+    xlim([0 1]);
+    ylim([0.0 2.1]);
+    yticks([Y_G2_C, Y_G1_C]);
+    yticklabels({'', ''});
+    set(ax2, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold', 'YDir', 'normal');
+    box off;
 
-linkaxes([ax1, ax2], 'x');
+    linkaxes([ax1, ax2], 'x');
 
 
 % ---------- stats ---------- %
-ok   = ~isnan(ap);
-idx0 = (group_idx == 0) & ok';
-idx1 = (group_idx == 1) & ok';
+    ok   = ~isnan(ap);
+    idx0 = (group_idx == 0) & ok';
+    idx1 = (group_idx == 1) & ok';
 
-fprintf('\n<< AP position group diff >>\n');
-[~, p, ~, stats] = ttest2(ap(idx0), ap(idx1));
-fprintf(' AP peak: non-abused = %.3f ± %.3f, abused = %.3f ± %.3f\n', mean(ap(idx0)), std(ap(idx0)), mean(ap(idx1)), std(ap(idx1)));
-fprintf('          - T(%d)=%.3f, p=%.3f\n', stats.df, stats.tstat, p);
+    fprintf('\n<< AP position group diff >>\n');
+    [~, p, ~, stats] = ttest2(ap(idx0), ap(idx1));
+    fprintf(' AP peak: non-abused = %.3f ± %.3f, abused = %.3f ± %.3f\n', mean(ap(idx0)), std(ap(idx0)), mean(ap(idx1)), std(ap(idx1)));
+    fprintf('          - T(%d)=%.3f, p=%.3f\n', stats.df, stats.tstat, p);
 
 
 
@@ -790,7 +801,7 @@ function beta_avg = accumulate_beta(beta_struct, trial_idx, vol_size)
     count = 0;
     for t = trial_idx
         if t > length(beta_struct); continue; end
-        b = beta_struct(t).enc_ctrl;
+        b = beta_struct(t).enc_ctrl; %%%%%
         if ~isempty(b)
             acc   = acc + double(b);
             count = count + 1;
@@ -816,13 +827,13 @@ end
 
 function [pos, peak_val] = ap_peak(beta_vol, idx_hpc, mm_hpc, ax, head_proj, ax_range, bw_mm)
     % Gaussian-smoothed 1D AP profile → peak position and beta value at peak
-    % bw_mm: smoothing bandwidth (mm), set by PEAK_BW_MM above
+    % bw_mm: smoothing bandwidth (mm), 상단 PEAK_BW_MM에서 지정
     beta_vals = double(beta_vol(idx_hpc));
-    proj_vals = mm_hpc * ax;          % AP projection per voxel (N×1)
+    proj_vals = mm_hpc * ax;          % 각 복셀의 AP 투영값 (N×1)
 
-    x_eval  = linspace(head_proj, head_proj + ax_range, 200);  % evaluation points
+    x_eval  = linspace(head_proj, head_proj + ax_range, 200);  % 연속 평가점
     K       = exp(-0.5 * ((x_eval' - proj_vals') / bw_mm).^2); % 200×N
-    profile = (K * beta_vals) ./ sum(K, 2);                    % Gaussian-weighted average
+    profile = (K * beta_vals) ./ sum(K, 2);                    % Gaussian 가중 평균
 
     [peak_val, pk_i] = max(profile);
     pos = (x_eval(pk_i) - head_proj) / ax_range;
@@ -830,8 +841,8 @@ end
 
 
 function pos = ap_peak_norm(proj_norm_vals, beta_vals, bw_norm)
-    % Gaussian-smoothed peak in pre-normalized [0,1] space
-    % used for bilateral combined peak (L+R voxels pooled after per-hemisphere normalization)
+    % Gaussian-smoothed peak in pre-normalized [0,1] space.
+    % Used for bilateral combined peak (L+R voxels pooled after per-hemisphere normalization).
     % bw_norm: bandwidth in [0,1] units = PEAK_BW_MM / ax_range
     x_eval  = linspace(0, 1, 200);
     K       = exp(-0.5 * ((x_eval' - proj_norm_vals(:)') / bw_norm).^2);  % 200×N

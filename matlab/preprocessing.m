@@ -5,12 +5,12 @@
 
 %% define parameters
 
-IN_PATH = 'C:\fMRI_directory'; % directory of fMRI data (nifti)
+IN_PATH_FMRI = 'C:\fMRI_directory'; % directory of fMRI data (nifti)
 
 DIR_T1_NAME = 'T1';
 DIR_FUNC_LIST = {'M1', 'M2', 'M3', 'M4'};
 
-sbj_list = dir(IN_PATH);
+sbj_list = dir(IN_PATH_FMRI);
 sbj_list = arrayfun(@(x) x.name, sbj_list(3:end), 'uni', 0);
 
 
@@ -21,12 +21,12 @@ for sbj_i = 1:length(sbj_list)
     try
         sbj_name = sbj_list{sbj_i};
 
-        dir_t1 = fullfile(IN_PATH, sbj_name, DIR_T1_NAME);
+        dir_t1 = fullfile(IN_PATH_FMRI, sbj_name, DIR_T1_NAME);
         file_name_t1 = dir(dir_t1);
         file_name_t1 = file_name_t1(3);
         file_name_t1 = fullfile(file_name_t1.folder, file_name_t1.name);
 
-        func_dir_list = cellfun(@(x) fullfile(IN_PATH, sbj_name, x), DIR_FUNC_LIST, 'uni', 0);
+        func_dir_list = cellfun(@(x) fullfile(IN_PATH_FMRI, sbj_name, x), DIR_FUNC_LIST, 'uni', 0);
         func_list = {};
         for run_i = 1:length(func_dir_list)
             file_list = dir(func_dir_list{run_i});

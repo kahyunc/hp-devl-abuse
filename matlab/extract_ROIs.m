@@ -5,11 +5,11 @@
 
 %% define parameters
 
-seg_dir = 'C:\freesurfer_directory_path'; % directory of FreeSurfer output files
+IN_PATH_FREESURFER = 'C:\freesurfer_directory_path'; % directory of FreeSurfer output files
 out_dir = 'C:\directory_to_save'; % directory to save ROI extracted data
 if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 
-d = dir(seg_dir);
+d = dir(IN_PATH_FREESURFER);
 d_names = {d.name};
 sbj_list = d_names(contains(d_names, 'A'));
 sbj_nums = cell2mat(arrayfun(@(num) str2double(sbj_list{num}(2:end))-100, 1:length(sbj_list), 'uni', 0));
@@ -20,7 +20,7 @@ sbj_nums = cell2mat(arrayfun(@(num) str2double(sbj_list{num}(2:end))-100, 1:leng
 for sbj_i = 1:length(sbj_list)
     sbj_name = sbj_list{sbj_i};
     
-    IN_DIR = fullfile(seg_dir, sbj_name);
+    IN_DIR = fullfile(IN_PATH_FREESURFER, sbj_name);
     OUT_FILE_NAME = fullfile(out_dir, sprintf('%s.mat', sbj_name));
 
     try

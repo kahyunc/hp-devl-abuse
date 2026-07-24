@@ -5,18 +5,18 @@
 
 %% define parameters
 
-bhv_raw_path = 'C:\raw_behavior_directory'; % directory of raw behavioral data
-bhv_save_path = 'C:\behavior_directory'; % directory to save preprocessed behavioral data
+IN_PATH_BHV_RAW = 'C:\raw_behavior_directory'; % directory of raw behavioral data
+IN_PATH_BHV = 'C:\behavior_directory'; % directory to save preprocessed behavioral data
 
-bhv_dir = dir(bhv_raw_path); bhv_dir(1:2) = [];
+bhv_dir = dir(IN_PATH_BHV_RAW); bhv_dir(1:2) = [];
 sbj_date = cellfun(@(x) x(1:6), {bhv_dir.name}, 'uni', 0);
 sbj_list = cellfun(@(x) x(9:11), {bhv_dir.name}, 'uni', 0);
-sbj_nums = cellfun(@(x) str2double(x), sbj_num_list);
+sbj_nums = cellfun(@(x) str2double(x), sbj_list);
 
 
 %% preprocess excel data
 
-xlsx_data_path = fullfile(bhv_raw_path, 'sbj_data.xlsx');
+xlsx_data_path = fullfile(IN_PATH_BHV_RAW, 'sbj_data.xlsx');
 sbj_data = readtable(xlsx_data_path);
 
 sbj_age = sbj_data.Birth_age;
@@ -43,7 +43,7 @@ for sbj_i = 1:length(sbj_nums)
 
     sbj_folder_name = [sbj_date{sbj_idx} '_A' sbj_list{sbj_idx}];
     bhv_file_name = [sbj_date{sbj_idx} '_sbj', sbj_list{sbj_idx}, '_WCDWWW.mat'];
-    sbj_file_path = fullfile(bhv_raw_path, sbj_folder_name, bhv_file_name);
+    sbj_file_path = fullfile(IN_PATH_BHV_RAW, sbj_folder_name, bhv_file_name);
     
     if ~exist(sbj_file_path, 'file')
         bhv = [];
@@ -138,7 +138,7 @@ for sbj_i = 1:length(sbj_nums)
                 for f_i = 1:length(where_fail_location)
                     fail_event(f_i) = find(where_ans(block_i, :) == where_fail_location(f_i));
                 end
-                where_err_list = [what_err_list where_fail_location];
+                where_err_list = [where_err_list where_fail_location];
                 where_err_animal = [where_err_animal what_ans(block_i, fail_event)];
             end
         end
@@ -168,7 +168,7 @@ for sbj_i = 1:length(sbj_nums)
     end
     
     sbj_file_name = ['bhvData_A' sbj_list{sbj_idx} '.mat'];
-    out_file_path = fullfile(bhv_save_path, sbj_file_name);
+    out_file_path = fullfile(IN_PATH_BHV, sbj_file_name);
     save(out_file_path, 'bhv');
     
     fprintf([num2str(sbj_i), '\t']);

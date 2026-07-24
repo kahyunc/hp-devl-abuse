@@ -5,21 +5,21 @@
 
 %% define parameters
 
-in_fmri_path = 'C:\fMRI_directory'; % directory of fMRI data (nifti)
-in_free_path = 'C:\freesurfer_directory'; % directory of FreeSurfer output data
-regressor_path = 'C:\regressor_directory'; % directory of regressor files
+IN_PATH_FMRI = 'C:\fMRI_directory'; % directory of fMRI data (nifti)
+IN_PATH_FREESURFER = 'C:\freesurfer_directory'; % directory of FreeSurfer output data
+IN_PATH_REG = 'C:\regressor_directory'; % directory of regressor files
 
 
 % load subject list
 subject_path = 'C:\subject_info_directory';
-load(fullfile(subject_path, 'subject_list_for_CONN.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'rejected_run_sbj', 'rejected_run_list'
+load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'rejected_run_sbj', 'rejected_run_list'
 
 reject_run_sbj = cellfun(@(x) str2double(x(2:end))-100, rejected_run_sbj);
 reject_run = rejected_run_list;
 
 
 % file list
-t1_list = cellfun(@(x) [in_free_path x '/mri/T1.mgz'], sbj_list, 'uni', 0);
+t1_list = cellfun(@(x) [IN_PATH_FMRI x '/T1/'], sbj_list, 'uni', 0);
 func_list = cell(1, num_sbj);
 for sbj_i = 1:num_sbj
     if ~isempty(find(reject_run_sbj == sbj_nums(sbj_i), 1))
@@ -29,11 +29,11 @@ for sbj_i = 1:num_sbj
     end
     func_list{sbj_i} = cell(1, length(run_list));
     for run_i = 1:length(run_list)
-        tmp = [in_fmri_path sbj_list{sbj_i} '/' num2str(run_list(run_i)) '/f*.nii'];
+        tmp = [IN_PATH_FMRI sbj_list{sbj_i} '/' num2str(run_list(run_i)) '/f*.nii'];
         func_list{sbj_i}{run_i} = cellstr(conn_dir(tmp));
     end
 end
-STRUCTURAL_FILE = t1_list;
+STRUCTURAL_FILE = cellstr(cellfun(@(x) conn_dir([x '/s*.nii']), t1_list, 'uni', 0));
 FUNCTIONAL_FILE = func_list;
 
 nsessions = cellfun(@length, func_list);
@@ -41,20 +41,11 @@ TR = 2;
 
 
 % ROI mask files
-roi_path = cellfun(@(x) [in_free_path x '/label/lh.aparc.annot'], sbj_list, 'uni', 0);
-roi_name = 'FS_atlas';
-
-roi_path2 = cellfun(@(x) [in_free_path x '/mri/aparc+aseg.mgz'], sbj_list, 'uni', 0);
-roi_name2 = 'FS_aseg';
-
-roi_name3 = {'LaHPC', 'LpHPC', 'Lbody', 'Ltail', 'LCA1', 'LCA23DG', 'LSub', ...
-             'RaHPC', 'RpHPC', 'Rbody', 'Rtail', 'RCA1', 'RCA23DG', 'RSub', ...
-             'BaHPC', 'BpHPC', 'Bbody', 'Btail', 'BCA1', 'BCA23DG', 'BSub'};
-roi_path3 = cell(1, length(roi_name3));
-for roi_i = 1:length(roi_name3)
-    mask_path = 'C:\freesurfer_mask_directory';
-    roi_path3{roi_i} = cellfun(@(x) [mask_path, x, '/', roi_name3{roi_i}, '.nii'], sbj_list, 'uni', 0);
-end
+dir_mask = 'C:\mask_directory';
+d = dir(dir_mask); d(1:2) = [];
+mask_names = {d.name}; 
+mask_names = cellfun(@(x) x(2:end-4), mask_names, 'uni', 0);
+mask_paths = arrayfun(@(num) fullfile(d(num).folder, d(num).name), 1:length(d), 'uni', 0);
 
 
 % condition
@@ -73,23 +64,34 @@ for sbj_i = 1:length(sbj_list)
     for run_i = run_idx
         count = count + 1;
         
-        task_reg = fullfile(regressor_path, sprintf('%s_run%d.mat', sbj_list{sbj_i}, run_i));
+        task_reg = fullfile(IN_PATH_REG, sprintf('%s_run%d.mat', sbj_list{sbj_i}, run_i));
         reg = load(task_reg);
         
         fixenc_i = 2; enc_i = 3;
         enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
         enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i} + 6; % hemodynamic delay
+
+        % -- control 1) excluding the pre-encoding fixation
+        % enc_i = 3;
+        % enc_onsets{sbj_i}{count} = reg.onsets{enc_i};
+        % enc_durations{sbj_i}{count} = reg.durations{enc_i} + 6; % hemodynamic delay
+
+        % -- control 2) excluding the post-encoding extension
+        % fixenc_i = 2; enc_i = 3;
+        % enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
+        % enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i};
+
     end
 end
 
 
-%% SETUP
+%% SETUP & PREPROCESSING
 
 global CONN_gui; CONN_gui.usehighres = true; % to fix "usehighres" error
 
 clear batch;
 
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj));
+batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj));
 batch.parallel.N = 3;
 
 batch.Setup.nsubjects = num_sbj;
@@ -105,84 +107,34 @@ batch.Setup.structurals = STRUCTURAL_FILE;
 
 for sbj_i = 1:num_sbj
     for run_i = 1:nsessions(sbj_i)
-        batch.Setup.conditions.names={'rest', 'retrieval', 'encoding'};
+        batch.Setup.conditions.names={'rest', 'encoding'};
         batch.Setup.conditions.onsets{1}{sbj_i}{run_i} = 0;
         batch.Setup.conditions.durations{1}{sbj_i}{run_i} = inf;
         batch.Setup.conditions.onsets{2}{sbj_i}{run_i} = enc_onsets{sbj_i}{run_i};
         batch.Setup.conditions.durations{2}{sbj_i}{run_i} = enc_durations{sbj_i}{run_i};
     end
 end
+batch.Setup.rois.names = mask_names;
+batch.Setup.rois.files = mask_paths;
+batch.Setup.rois.add = 1; %use 1 to define an additional set of ROIs (to be added to any already-existing ROIs in your project)
 
+%
 batch.Setup.isnew = 1; % new file
-batch.Setup.done = 0; % save without running
 
-conn_batch(batch);
-
-
-%% PREPROCESSING
-
-clear batch;
-
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj));
-batch.parallel.N = 3; % 3
-
-conn_importaseg;
-
-batch.Setup.isnew = 0; % existing file
-batch.Setup.analyses = [1 2 4]; % except voxel-to-voxel
-batch.Setup.voxelresolution = 4;
-
-batch.Setup.preprocessing.steps = 'default_ss';
+batch.Setup.preprocessing.steps = 'default_mni';
 batch.Setup.preprocessing.sliceorder = 'interleaved (bottom-up)'; % 1-3-5-...-2-4-...
-batch.Setup.preprocessing.diffusionsteps = 40; % enter number of diffusion steps for smoothing: 40
-
 batch.Setup.done = 1;
 batch.Setup.overwrite = 'Yes';
 
 conn_batch(batch);
 
 
-%% ROI - subject-space connectivity: aparc+aseg.mgz (subject-space)
-clear batch;
-
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj));
-
-batch.Setup.rois.names = {roi_name2};
-batch.Setup.rois.files = {roi_path2};
-batch.Setup.rois.dataset = 7; % subject-space (7)
-batch.Setup.rois.add = 0; % use 1 to define an additional set of ROIs (to be added to any already-existing ROIs in your project)
-
-batch.Setup.done = 0; % save without running
-conn_batch(batch);
-
-
-%% ROI - subject-space connectivity: freesurfer mask (subject-space)
-clear batch;
-
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj));
-batch.parallel.N = 4;
-
-batch.Setup.rois.names = roi_name3;
-batch.Setup.rois.files = roi_path3;
-batch.Setup.rois.dataset = ones(1,length(roi_name3))*7; % subject-space
-batch.Setup.rois.add = 1; % use 1 to define an additional set of ROIs (to be added to any already-existing ROIs in your project)
-
-batch.Setup.done = 1; % save with running
-conn_batch(batch);
-
-
-%% CONN display: atlas ROI setup
-% ROI 1, 2) -> advanced options (Atlas file V / Subject-specific ROI V)
-
-conn
-conn('load', fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj)));
-
 
 %% DENOISING & FIRST-LEVEL ANALYSIS
 
 clear batch;
 
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj));
+batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj));
 batch.parallel.N = 4;
 
 % DENOISING
@@ -206,7 +158,7 @@ conn_batch(batch);
 %% CONN display: for 2nd level analysis (GUI)
 
 conn
-conn('load', fullfile('../results/CONN', sprintf('conn_N%d_indiv.mat', num_sbj)));
+conn('load', fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj)));
 
 conn gui_results
 

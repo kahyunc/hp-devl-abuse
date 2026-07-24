@@ -1273,7 +1273,7 @@ if ~isControl
     
     Screen('Flip', window);
     
-    fprintf('** reenactment **/n');
+    fprintf('** reenactment **\n');
 
     Data.time(end+1).run = currRun;
     Data.time(end).trial = currTrial;

@@ -58,6 +58,8 @@ target_con = {'enc-ctrl'};
 % group_idx = (1:length(included_sbj)); group_name = '';
 group_idx = (eti_ea == 0); group_name = '_ETIX';
 % group_idx = (eti_ea > 0); group_name = '_ETIO';
+
+covars = {}; % covariates, e.g. {{'age', sbj_age}, {'sex', double(sbj_sex)}}
 %%%%%%%%%%%%%%%%
 
 excluded_idx = cell2mat(arrayfun(@(num) find(sbj_nums == excluded_sbj(num)), 1:length(excluded_sbj), 'uni', 0));
@@ -72,7 +74,7 @@ for con_i = 1:length(target_con)
     out_dir = fullfile(OUT_PATH, group_name, target_con{con_i});
     if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 
-    in_path = fullfile(IN_PATH, '_organized');
+    in_path = fullfile(IN_PATH_FIRST, '_organized');
     file_list = cellfun(@(x) fullfile(in_path, x, sprintf('%s.nii', target_con{con_i})), tmp_sbj, 'uni', 0);
 
     % check if empty
@@ -151,7 +153,7 @@ GROUP_OUT_PATH = ['../results/glm_norm_smooth/', group_2nd_name];
 for con_i = 1:length(target_con)
     cd(WORKING_DIRECTORY)
 
-    in_path = fullfile(IN_PATH, '_organized');
+    in_path = fullfile(IN_PATH_FIRST, '_organized');
 
     out_dir = fullfile(GROUP_OUT_PATH, sprintf('%s%s', target_group_name, group_name), target_con{con_i});
     if ~exist(out_dir, 'dir'); mkdir(out_dir); end
@@ -221,6 +223,7 @@ var1 = double(eti_ea == 0);  var1_name = 'eti';
 var2 = em_acc{4};            var2_name = 'whatw';
 
 group_idx = (1:length(included_sbj)); group_name = '';
+CASE_NUM = '01'; % analysis case identifier (example)
 %%%%%%%%%%%%%%%%
 
 var_list_all = {var1, var2, var1.*var2};
@@ -238,7 +241,7 @@ for con_i = 1:length(target_con)
     tmp_sbj = sbj_list(group_idx);
     cov = cov(:, group_idx);
 
-    in_dir = cellfun(@(x) fullfile(IN_PATH, '_organized', x, sprintf('%s.nii', target_con{con_i})), tmp_sbj, 'uni', 0);
+    in_dir = cellfun(@(x) fullfile(IN_PATH_FIRST, '_organized', x, sprintf('%s.nii', target_con{con_i})), tmp_sbj, 'uni', 0);
     out_dir = fullfile(CORR_OUT_PATH, target_con{con_i}, sprintf('interaction_%s%s#%s', group_name, var1_name, var2_name));
     if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 
@@ -280,13 +283,13 @@ for con_i = 1:length(target_con)
     
     matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
     matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = '-';
-    if strcmp(c_sign, 'pos')
+    if strcmp(corr_sign, 'pos')
         tmp_weights = weight_matrix; tmp_weights(2) = 1;
         matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
-    elseif strcmp(c_sign, 'neg')
+    elseif strcmp(corr_sign, 'neg')
         tmp_weights = weight_matrix; tmp_weights(2) = -1;
         matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
-    elseif strcmp(c_sign, 'full')
+    elseif strcmp(corr_sign, 'full')
         tmp_weights = weight_matrix; tmp_weights(end) = 1;
         matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
     end

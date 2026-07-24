@@ -70,6 +70,7 @@ if fig_draw
     err6.Color = [0 0 0]; err6.LineStyle = 'none'; err6.LineWidth = 1; err6.CapSize = 0;
 
     %
+    % requires hatchfill2 (MATLAB File Exchange; not redistributed here)
     hatchfill2(b3, 'single', 'HatchAngle', 60, 'HatchDensity', 15, 'HatchColor', 'k');
     hatchfill2(b4, 'single', 'HatchAngle', 60, 'HatchDensity', 15, 'HatchColor', 'k');
     hatchfill2(b6, 'single', 'HatchAngle', 60, 'HatchDensity', 15, 'HatchColor', 'k');
@@ -461,3 +462,176 @@ if lme_analysis
 end
 
 
+%% error patterns (binding preserved ratio)
+
+
+tmp_group = (eti_ea > 0);
+tmp_category = categorical(tmp_group, logical([0 1]), {'non-abused', 'abused'});
+
+% set-up: error bias
+whatwhere_ans = cellfun(@(x) x.expInfo.animal.*10 + x.expInfo.location, bhv_list, 'uni', 0);
+whatwhere_resp = cellfun(@(x) x.reenact.animal.*10 + x.reenact.location, bhv_list, 'uni', 0);
+
+whatwhere_list = cell(1, length(whatwhere_ans));
+for sbj_i = 1:length(whatwhere_ans)
+    for x_i = 1:size(whatwhere_ans{sbj_i}, 1)
+        for y_i = 1:size(whatwhere_ans{sbj_i}, 2)
+            tmp = sum(whatwhere_ans{sbj_i}(x_i, :) == whatwhere_resp{sbj_i}(x_i, y_i));
+            whatwhere_list{sbj_i}(x_i, y_i) = tmp;
+        end
+    end
+end
+whatwhen_list = cellfun(@(x) x.reenact.animalAcc, bhv_list, 'uni', 0);
+wherewhen_list = cellfun(@(x) x.reenact.locationAcc, bhv_list, 'uni', 0);
+fullem_list = cellfun(@(x) x.reenact.animalAcc + x.reenact.locationAcc, bhv_list, 'uni', 0);
+
+%
+x_fullem = []; o_whatwhen = []; o_wherewhen = []; o_whatwhere = []; 
+for sbj_i = 1:length(fullem_list)
+    wrong_flag = (fullem_list{sbj_i} < 2);
+    x_fullem(sbj_i) = sum((wrong_flag==1), 'all');
+    
+    o_whatwhen(sbj_i)  = sum(whatwhen_list{sbj_i}(wrong_flag) == 1);
+    o_wherewhen(sbj_i) = sum(wherewhen_list{sbj_i}(wrong_flag) == 1);
+    o_whatwhere(sbj_i) = sum(whatwhere_list{sbj_i}(wrong_flag) == 1);
+    
+    tmp = sum(whatwhen_list{sbj_i}(wrong_flag) == 0 & wherewhen_list{sbj_i}(wrong_flag) == 0 & whatwhere_list{sbj_i}(wrong_flag) == 0);
+    x_binding(sbj_i) = tmp;
+end
+
+%
+r_whatwhen  = arrayfun(@(num) o_whatwhen(num)/x_fullem(num), 1:length(fullem_list));
+r_wherewhen = arrayfun(@(num) o_wherewhen(num)/x_fullem(num), 1:length(fullem_list));
+r_whatwhere = arrayfun(@(num) o_whatwhere(num)/x_fullem(num), 1:length(fullem_list));
+r_binding_x = arrayfun(@(num) x_binding(num)/x_fullem(num), 1:length(fullem_list));
+
+error_r_list = {r_whatwhen, r_wherewhen, r_whatwhere, r_binding_x};
+tmpLabel = {'what-when', 'where-when', 'what-where', 'failure'};
+
+group_list = {(eti_ea == 0), (eti_ea > 0)}; group_name = 'eti';
+group_label = {'non', 'abused'};
+group_color = [0.3 0.3 0.3; 223/255 153/255 153/255];
+
+% --- Figure 1: Group difference (box plots) ---
+draw_fig1 = true;
+if draw_fig1
+    % what-when: blue, where-when: green, what-where: purple (new), failure: grey (full EM)
+    type_colors = {[70 111 156; 160 185 212]./255, ...    % what-when
+                   [76 120 105; 171 201 191]./255, ...    % where-when
+                   [115 75 140; 185 160 210]./255, ...    % what-where
+                   [0.3 0.3 0.3; 0.7 0.7 0.7]};          % failure (full EM)
+
+    figure;
+    set(gcf, 'Position', [100 100 650 150]);
+
+    fprintf('\n== Group difference (t-test) ==\n');
+    for acc_i = 1:length(error_r_list)
+        subplot(1, 4, acc_i);
+
+        curr_group_color = type_colors{acc_i};
+
+        fig_box = boxchart(error_r_list{acc_i}(:), 'GroupByColor', tmp_category); hold on
+        for g_i = 1:length(fig_box)
+            fig_box(g_i).BoxEdgeColor = 'k';
+            fig_box(g_i).BoxFaceColor = curr_group_color(g_i, :);
+            fig_box(g_i).BoxFaceAlpha = 1;
+            fig_box(g_i).MarkerStyle = 'none';
+            fig_box(g_i).LineWidth = 0.8;
+        end
+
+        fig_dot = []; dot_density = 3;
+        bar_width_half = 0.3 - dot_density * 0.07;
+        for graph_i = 1:2
+            curr_data = error_r_list{acc_i}(tmp_group == graph_i-1);
+            y_draw = sort(curr_data(:));
+            y_draw = y_draw(~isnan(y_draw));
+            y_unique = unique(y_draw);
+            num_repeated = arrayfun(@(x) sum(x==y_draw), y_unique);
+            x_draw = arrayfun(@(x) linspace(-bar_width_half, bar_width_half, x - mod(x,2)), num_repeated, 'UniformOutput', false);
+            x_draw(mod(num_repeated,2)==1) = cellfun(@(x) [x 0], x_draw(mod(num_repeated,2)==1), 'UniformOutput', false);
+            x_draw = cell2mat(reshape(x_draw,1,[])) + graph_i/2 + 0.05;
+            fig_dot_temp = scatter(x_draw, y_draw', 4, ' k', 'filled', 'HandleVisibility', 'off');
+            fig_dot_temp.MarkerFaceAlpha = 0.2;
+            fig_dot = [fig_dot fig_dot_temp];
+        end
+
+        d1 = error_r_list{acc_i}(group_list{1});
+        d2 = error_r_list{acc_i}(group_list{2});
+        [~, p, ~, stats] = ttest2(d1(:), d2(:));
+        fprintf('%s: t(%d) = %.3f, p = %.4f\n', tmpLabel{acc_i}, stats.df, stats.tstat, p);
+
+        xticklabels(tmpLabel(acc_i));
+        ylabel('ratio'); ylim([-0.05 1.05]);
+        hold off;
+        box off;
+        set(gca, 'LineWidth', 0.8);
+        set(gca, 'FontName', 'Helvetica', 'FontSize', 6, 'FontWeight', 'bold');
+    end
+end
+
+
+% --- Figure 2: Group correlation (age) ---
+draw_fig2 = true;
+if draw_fig2
+    all_correct_idx = (x_fullem == 0);
+
+    % group_idx = (em_acc{6} < mean(em_acc{6})); group_names = {'bad', 'good'};
+    group_idx = (eti_ea == 0); group_names = {'non', 'abused'};
+
+    tmpData = {r_whatwhen, r_wherewhen, r_whatwhere, r_binding_x};
+
+    fprintf('\n== Age correlation per group ==\n');
+    for fig_i = 1:length(tmpData)
+        figure;
+        set(gcf, 'Position', [100 100 280 140]);
+        % sgtitle(tmpLabel{fig_i}, 'FontSize', 7, 'FontWeight', 'bold');
+
+        currData = tmpData{fig_i};
+
+        subplot(1, 2, 1);
+        tmp_idx = (~all_correct_idx & group_idx);
+        x_reg = reshape(sbj_age(tmp_idx),[],1); y_reg = reshape(currData(tmp_idx),[],1);
+        nan_reg = isnan(x_reg) | isnan(y_reg); x_reg(nan_reg) = []; y_reg(nan_reg) = [];
+        [r, p] = corr(x_reg, y_reg);
+        fig_scatter = scatter(x_reg, y_reg, 6, 'filled'); hold on
+        fig_line = lsline;
+        mdl = fitlm(x_reg, y_reg);
+        xx = linspace(min(x_reg), max(x_reg), 1000); [~, ci] = predict(mdl, xx');
+        fill([xx, flip(xx)]', [ci(:,1)', flip(ci(:,2))']', [.5 .5 .5], 'FaceAlpha', 0.2, 'linestyle', 'none');
+        fig_scatter.MarkerFaceColor = group_color(1,:);
+        fig_scatter.SizeData = 6;
+        fig_line.LineWidth = 1.2;
+        if p < 0.05; fig_line.Color = [1 0.5 0.5]; end
+        % yline(0, 'k:');
+        ylabel(tmpLabel{fig_i});  xlabel('age');
+        xlim([9 19]);  xticks(10:2:18); ylim([-0.05 1.05]);
+        % title(group_names{1}, 'FontSize', 6);
+        box off;
+        set(gca, 'LineWidth', 0.8);
+        set(gca, 'FontName', 'Helvetica', 'FontSize', 6, 'FontWeight', 'bold');
+        fprintf('%s - %s: r = %.3f, p = %.4f\n', tmpLabel{fig_i}, group_names{1}, r, p);
+
+        subplot(1, 2, 2);
+        tmp_idx = (~all_correct_idx & ~group_idx);
+        x_reg = reshape(sbj_age(tmp_idx),[],1); y_reg = reshape(currData(tmp_idx),[],1);
+        nan_reg = isnan(x_reg) | isnan(y_reg); x_reg(nan_reg) = []; y_reg(nan_reg) = [];
+        [r, p] = corr(x_reg, y_reg);
+        fig_scatter = scatter(x_reg, y_reg, 6, 'filled'); hold on
+        fig_line = lsline;
+        mdl = fitlm(x_reg, y_reg);
+        xx = linspace(min(x_reg), max(x_reg), 1000); [~, ci] = predict(mdl, xx');
+        fill([xx, flip(xx)]', [ci(:,1)', flip(ci(:,2))']', [.5 .5 .5], 'FaceAlpha', 0.2, 'linestyle', 'none');
+        fig_scatter.MarkerFaceColor = group_color(2,:);
+        fig_scatter.SizeData = 6;
+        fig_line.LineWidth = 1.2;
+        if p < 0.05; fig_line.Color = [1 0.5 0.5]; end
+        % yline(0, 'k:');
+        ylabel('');  xlabel('age');
+        xlim([9 19]);  xticks(10:2:18); ylim([-0.05 1.05]);
+        % title(group_names{2}, 'FontSize', 6);
+        box off;
+        set(gca, 'LineWidth', 0.8);
+        set(gca, 'FontName', 'Helvetica', 'FontSize', 6, 'FontWeight', 'bold');
+        fprintf('%s - %s: r = %.3f, p = %.4f\n', tmpLabel{fig_i}, group_names{2}, r, p);
+    end
+end

@@ -1,13 +1,42 @@
 % Episodic memory task for adolescents
-% :: seed-based functional connectivity - analysis (statistics)
+% :: seed-based functional connectivity - second level (SPM12)
 % :: code written by Kahyun Choi
 
 
 %% define parameters
 
+WORKING_DIRECTORY = pwd;
+
+IN_PATH_FIRST = 'C:\connectivity_output_directory'; % directory of connectivity output 
+
+d = dir(IN_PATH_FIRST); d_names = {d.name};
+sbj_list = d_names(contains(d_names, 'A'));
+sbj_nums = cellfun(@(x) str2double(x(2:end))-100, sbj_list);
+
+
 % load subject list
 subject_path = 'C:\subject_info_directory';
 bhv_nums = load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'num_sbj'
+
+
+% setup
+OUT_PATH = fullfile(IN_PATH_FIRST, 'connectivity_2nd_level');
+if ~exist(OUT_PATH, 'dir'); mkdir(OUT_PATH); end
+
+
+% contrasts
+condition_i = 2; % 1: rest, 2: encoding
+cond_name = {'rest', 'encoding'};
+
+
+% ROIs
+roi_file_name = sprintf('resultsROI_Condition%.3d.mat', condition_i);
+load(fullfile(IN_PATH_FIRST, roi_file_name), 'names');
+
+roi_seed_idx = [165 166 167 168 169 170 171 172 173]; % hippocampus
+roi_seed_names = names(roi_seed_idx);
+roi_seed_names = cellfun(@(x) strrep(x, '_', '-'), roi_seed_names, 'uni', 0);
+
 
 % behavior
 load(fullfile(subject_path, 'behavioral_data.mat')); % 'em_acc', 'sbj_age', 'sbj_sex'
@@ -20,332 +49,332 @@ sbj_eti = table2struct(sbj_eti); % ALL, GT, PA, EA, Q1~21
 eti_ea = [sbj_eti.EA];
 
 
-% connectivity
-dir_conn_first = 'C:\connectivity_first_level_directory'; % directory of CONN first-level analysis results
 
-Z_surf = cell(1,3);
-for con_i = 1:3
-    roi_file_name = sprintf('resultsROI_Condition%.3d.mat', con_i);
-
-    %%% roi_file: DOF(n2), SE(sbj*n2), Z(n1*n2*sbj), names(n1), names2(n2), regressors(n1), xyz(n2)
-    results = load(fullfile(dir_conn_first, roi_file_name));
-
-    %%% ROI
-    % seed ROI (names): hippocampus
-    target_name = {'LaHPC', 'LpHPC', 'LCA1', 'LCA23DG', 'LSub', ...
-               'RaHPC', 'RpHPC', 'RCA1', 'RCA23DG', 'RSub', ...
-               'BaHPC', 'BpHPC', 'BCA1', 'BCA23DG', 'BSub'};
-
-    seed_hp_idx1 = find(contains(results.names, 'Hippocampus'));
-    seed_hp_idx2 = cellfun(@(x) find(contains(results.names, x), 1), target_name);
-    roi_seed_idx = [seed_hp_idx1, seed_hp_idx2];
-
-    roi_seed_names = {'LHP', 'RHP', 'LaHP', 'LpHP', 'LCA1', 'LCA23DG', 'LSub', ...
-                      'RaHP', 'RpHP', 'RCA1', 'RCA23DG', 'RSub', 'RCA1-A', ...
-                      'BaHP', 'BpHP', 'BCA1', 'BCA23DG', 'BSub', 'BCA1-A'};
-
-    % target ROI (names2)
-    exclude_name = {'Cerebral', 'Vent', 'Matter', 'Brain-Stem', 'CSF', 'choroid', 'hypointensities', 'Optic-Chiasm', 'CC_', 'QC', 'HPC'};
-    exclude_idx = cellfun(@(x) find(contains(results.names2, x)), exclude_name, 'uni', 0);
-    exclude_idx = cell2mat(exclude_idx);
-    exclude_idx = [exclude_idx, roi_seed_idx];
-
-    roi_target_idx = setdiff(1:length(results.names2), exclude_idx);
-    roi_target_names = results.names2(roi_target_idx);
-
-    %%% Z value (transformed from Pearson's r correlation)
-    Z_surf{con_i} = results.Z(roi_seed_idx, roi_target_idx, :);
-end
-roi_target_names = cellfun(@(x) x(9:end), roi_target_names, 'uni', 0);
-
-tmp_label = {'Left-', '-lh-'}; roi_target_idx_left = cell2mat(cellfun(@(x) find(contains(roi_target_names, x)), tmp_label, 'uni', 0));
-tmp_label = {'Right-', '-rh-'}; roi_target_idx_right = cell2mat(cellfun(@(x) find(contains(roi_target_names, x)), tmp_label, 'uni', 0));
-
-% connectivity - bilateral seed
-avg_roi_name = ['B', roi_seed_names{1}(2:end)];
-roi_seed_names = {roi_seed_names{:}, avg_roi_name};
-for con_i = 1:length(Z_surf)
-    Z_surf{con_i}(end+1, :, :) = mean(Z_surf{con_i}(1:2, :, :), 1);
-end
-
-
-%% CA23DG connectivity: correlation (non-abused)
+%% run 2nd level: condition contrast - group difference 
 
 %%%%%%%%%%%%%%%%
-con_i = 3; % 3: encoding
-seed_i = 28; % 28: B.CA23DG, 27: B.CA1, 29: B.Subiculum, 36: B.Hippocampus
+roi_idx = 1:length(roi_seed_idx);
 
-group_idx = (eti_ea > 0);
+target_group = {find(eti_ea == 0), find(eti_ea > 0)}; 
+target_group_name = 'eti';
+
+group_idx = (1:length(bhv_list)); group_name = '';
 %%%%%%%%%%%%%%%%
 
-% ---------- stats (correlation) ---------- %
-stats_on = true;
-if stats_on
-    fprintf('<< CA23DG connectivity - correlation >>\n');
-    fprintf(' - non-abused -\n');
+group_2nd_name = ['group_N', num2str(length(bhv_list))];
+GROUP_OUT_PATH = ['../results/glm_norm_smooth/', group_2nd_name];
 
-    sig_idx = [];
-    for roi_i = 1:length(roi_target_names)
-        data = squeeze(Z_surf{con_i}( seed_i, roi_i, : ));
+for roi_i = roi_idx
+    cd(WORKING_DIRECTORY)
 
-        % - age -
-        [r1,p1] = corr(sbj_age(group_idx == 0)', data(group_idx == 0));
+    out_dir = fullfile(GROUP_OUT_PATH, cond_name{condition_i}, sprintf('%s%s', target_group_name, group_name), roi_seed_names{roi_i});
+    if ~exist(out_dir, 'dir'); mkdir(out_dir); end
+
+    file_names1 = arrayfun(@(x) sprintf('BETA_Subject%.3d_Condition%.3d_Source%.3d.nii', x, condition_i, roi_seed_idx(roi_i)), target_group{1}, 'uni', 0);
+    in_dir1 = cellfun(@(x) fullfile(IN_PATH_FIRST, 'HPC', x), file_names1, 'uni', 0);
+    file_names2 = arrayfun(@(x) sprintf('BETA_Subject%.3d_Condition%.3d_Source%.3d.nii', x, condition_i, roi_seed_idx(roi_i)), target_group{2}, 'uni', 0);
+    in_dir2 = cellfun(@(x) fullfile(IN_PATH_FIRST, 'HPC', x), file_names2, 'uni', 0);
+
+    %% batch
+    clear matlabbatch
+
+    matlabbatch{1}.spm.stats.factorial_design.dir = {out_dir};
     
-        % - full em -
-        [r2,p2] = corr(em_acc{6}(group_idx == 0)', data(group_idx == 0));
-
-        % - print results -
-        if p1 < 0.05 || p2 < 0.05
-            sig_idx = [sig_idx roi_i];
-
-            fprintf('%30s: age) r=%7.3f, p=%7.3f', roi_target_names{roi_i}, r1, p1);
-            fprintf('\tEM) r=%7.3f, p=%7.3f\n', r2, p2);
-        end
-    end
-    disp(' ');
-
-    % - check hemsipheric interactions -
-    if true
-        sig_idx_sort = [];
-        for roi_i = sig_idx
-            tmp_l = find(roi_target_idx_left == roi_i);
-            tmp_r = find(roi_target_idx_right == roi_i);
-            tmp_b = find(roi_target_idx_avg == roi_i);
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.scans1 = in_dir1(:);
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.scans2 = in_dir2(:);
     
-            sig_idx_sort = [sig_idx_sort tmp_l tmp_r tmp_b];
-        end
-        sig_idx_sort = unique(sig_idx_sort);
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.dept = 0;
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.variance = 1;
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.gmsca = 0;
+    matlabbatch{1}.spm.stats.factorial_design.des.t2.ancova = 0;
+    matlabbatch{1}.spm.stats.factorial_design.cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
+    matlabbatch{1}.spm.stats.factorial_design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
+    matlabbatch{1}.spm.stats.factorial_design.masking.tm.tm_none = 1;
+    matlabbatch{1}.spm.stats.factorial_design.masking.im = 0;
+    matlabbatch{1}.spm.stats.factorial_design.masking.em = {'C:\mask_directory\mask_ICV.nii'};
+    matlabbatch{1}.spm.stats.factorial_design.globalc.g_omit = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.gmsca.gmsca_no = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.glonorm = 1;
     
-        idx_age = []; idx_h_age = []; idx_acc = []; idx_h_acc = []; 
-        tbl_h_age = []; tbl_h_acc = []; count = 0;
-        for roi_i = sig_idx_sort
-            count = count+1;
-            tmp_conn_l = squeeze(Z_surf{con_i}( seed_i, roi_target_idx_left(roi_i), : ));
-            tmp_conn_r = squeeze(Z_surf{con_i}( seed_i, roi_target_idx_right(roi_i), : ));
-            tmp_conn = [tmp_conn_l(group_idx == 0)' tmp_conn_r(group_idx == 0)'];
+    matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+    matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
+    
+    matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = '-';
+    matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = [1 -1];
+    matlabbatch{3}.spm.stats.con.consess{1}.tcon.sessrep = 'none';
+    matlabbatch{3}.spm.stats.con.delete = 0;
+    
+    matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    matlabbatch{4}.spm.stats.results.conspec.titlestr = '';
+    matlabbatch{4}.spm.stats.results.conspec.contrasts = 1;
+    matlabbatch{4}.spm.stats.results.conspec.threshdesc = 'FWE';
+    matlabbatch{4}.spm.stats.results.conspec.thresh = 0.05;
+    matlabbatch{4}.spm.stats.results.conspec.extent = 0;
+    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
+    matlabbatch{4}.spm.stats.results.conspec.mask.none = 1;
+    matlabbatch{4}.spm.stats.results.units = 1;
+    matlabbatch{4}.spm.stats.results.export{1}.ps = true;
+    %
+    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
+    
+    %% run batch
+    batch = matlabbatch;
 
-            tmp_hemis = [ones(1, sum(group_idx == 0)) ones(1, sum(group_idx == 0))*2];
+    spm('defaults','fmri');
+    spm_jobman('initcfg');
+    spm_jobman('run',batch);
 
-            tmp_eti = eti_ea(group_idx == 0); tmp_eti = [tmp_eti tmp_eti];
-            tmp_age = sbj_age(group_idx == 0); tmp_age = [tmp_age tmp_age];
-            tmp_acc = em_acc{6}(group_idx == 0); tmp_acc = [tmp_acc tmp_acc]; % full EM
-
-            tmp_sbj = 1:sum(group_idx==0); tmp_sbj = [tmp_sbj tmp_sbj];
-
-            %
-            tmp_names = {'conn', 'hemis', 'age', 'acc', 'eti', 'sbj'};
-            tmp_cell = {tmp_conn', tmp_hemis', tmp_age', tmp_acc', tmp_eti', tmp_sbj'};
-            tmp_array = cell2mat(tmp_cell);
-            tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-            tmp_table.hemis = categorical(tmp_table.hemis);
-
-            % - hemisphere by age interaction -
-            lme = fitlme(tmp_table, 'conn~hemis*age+(hemis|sbj)');
-            if lme.Coefficients{3,6} < 0.05
-                idx_age = [idx_age roi_i];
-                disp(roi_target_names{roi_target_idx_avg(roi_i)}(5:end));
-                anova(lme)
-            end
-            if lme.Coefficients{4,6} < 0.05
-                idx_h_age = [idx_h_age roi_i];
-            end
-            tbl_h_age{count} = lme.Coefficients;
-            
-            % - hemisphere by acc interaction -
-            lme = fitlme(tmp_table, 'conn~hemis*acc+(hemis|sbj)');
-            if lme.Coefficients{3,6} < 0.05
-                idx_acc = [idx_acc roi_i];
-                disp(roi_target_names{roi_target_idx_avg(roi_i)}(5:end));
-                anova(lme)
-            end
-            if lme.Coefficients{4,6} < 0.05
-                idx_h_acc = [idx_h_acc roi_i];
-            end
-            tbl_h_acc{count} = lme.Coefficients;
-        end
-
-        % - print results -
-        fprintf(' -> hemispheric interaction?\n');
-        fprintf('  # main effects of age\n');
-        for i = 1:length(idx_age)
-            curr_idx = find(sig_idx_sort == idx_age(i));
-            curr_tbl = tbl_h_age{curr_idx};
-            fprintf('%30s: age) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_age(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-
-        fprintf('  # interaction effects between age and hemisphere\n');
-        for i = 1:length(idx_h_age)
-            curr_idx = find(sig_idx_sort == idx_h_age(i));
-            curr_tbl = tbl_h_age{curr_idx};
-            fprintf('%30s: age) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_h_age(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-
-        fprintf('  # main effects of acc\n');
-        for i = 1:length(idx_acc)
-            curr_idx = find(sig_idx_sort == idx_acc(i));
-            curr_tbl = tbl_h_acc{curr_idx};
-            fprintf('%30s: acc) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_acc(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-
-        fprintf('  # interaction effects between acc and hemisphere\n');
-        for i = 1:length(idx_h_acc)
-            curr_idx = find(sig_idx_sort == idx_h_acc(i));
-            curr_tbl = tbl_h_acc{curr_idx};
-            fprintf('%30s: acc) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_h_acc(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-    end
+    cd(WORKING_DIRECTORY)
 end
 
 
-%% CA23DG connectivity: correlation (abused)
+
+
+%% run 2nd level: multiple regression (correlation)
 
 %%%%%%%%%%%%%%%%
-con_i = 3; % 3: encoding
-seed_i = 28; % 28: B.CA23DG, 27: B.CA1, 29: B.Subiculum, 36: B.Hippocampus
+roi_idx = 1:length(roi_seed_idx);
 
-group_idx = (eti_ea > 0);
+target_bhv = sbj_age; target_names = {'age'};
+% target_bhv = em_acc{6}; target_names = {'fullem'};
+% target_bhv = em_acc{5}; target_names = {'wherewhen'};
+% target_bhv = em_acc{4}; target_names = {'whatwhen'};
+
+% group_idx = 1:length(bhv_list); group_name = '';
+group_idx = find(eti_ea == 0); group_name = 'ETIX_';
+% group_idx = find(eti_ea > 0); group_name = 'ETIO_';
 %%%%%%%%%%%%%%%%
 
-% ---------- stats (correlation) ---------- %
-stats_on = true;
-% stats_on = false;
-if stats_on
-    fprintf('<< CA23DG connectivity - correlation >>\n');
-    fprintf(' - abused -\n');
+correlation_name = sprintf('corr_N%d', length(bhv_list));
+CORR_OUT_PATH = ['../results/glm_norm_smooth/', correlation_name];
+if ~exist(CORR_OUT_PATH, 'dir'); mkdir(CORR_OUT_PATH); end
 
-    sig_idx = [];
-    for roi_i = 1:length(roi_target_names)
-        data = squeeze(Z_surf{con_i}( seed_i, roi_i, : ));
+for roi_i = roi_idx
+    cd(WORKING_DIRECTORY)
 
-        % - age -
-        [r1,p1] = corr(sbj_age(group_idx == 1)', data(group_idx == 1));
+    file_names = arrayfun(@(x) sprintf('BETA_Subject%.3d_Condition%.3d_Source%.3d.nii', x, condition_i, roi_seed_idx(roi_i)), group_idx, 'uni', 0);
+    in_dir = cellfun(@(x) fullfile(IN_PATH_FIRST, 'HPC', x), file_names, 'uni', 0);
+    cov = target_bhv(:, group_idx);
+
+    corr_sign = 'both';
+    out_dir = fullfile(CORR_OUT_PATH, cond_name{condition_i}, sprintf('%s%s', group_name, target_names), roi_seed_names{roi_i});
+    if ~exist(out_dir, 'dir'); mkdir(out_dir); end
+
+
+    %% batch
+    n_cov = size(cov, 1);
+
+    matlabbatch{1}.spm.stats.factorial_design.dir = {out_dir};
+    matlabbatch{1}.spm.stats.factorial_design.des.mreg.scans = in_dir(:);
+    for i = 1:n_cov
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).c     = cov(i, :);
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).cname = target_names{i};
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).iCC   = 1; % overall mean centering
+    end
+    matlabbatch{1}.spm.stats.factorial_design.des.mreg.incint   = 1;
+    matlabbatch{1}.spm.stats.factorial_design.cov       = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
+    matlabbatch{1}.spm.stats.factorial_design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
+    matlabbatch{1}.spm.stats.factorial_design.masking.tm.tm_none  = 1;
+    matlabbatch{1}.spm.stats.factorial_design.masking.im          = 0;
+    matlabbatch{1}.spm.stats.factorial_design.masking.em          = {'C:\mask_directory\mask_ICV.nii'};
+    matlabbatch{1}.spm.stats.factorial_design.globalc.g_omit      = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.gmsca.gmsca_no = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.glonorm     = 1;
+
+    matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', ...
+        substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+    matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
+
+    if strcmp(corr_sign, 'all')
+        contrast_idx = 1:n_cov;  % generate contrasts for all regressors
+    else
+        contrast_idx = 1;         % only variable of interest (first covariate)
+    end
     
-        % - full em -
-        [r2,p2] = corr(em_acc{6}(group_idx == 1)', data(group_idx == 1));
-
-        % - print results -
-        if p1 < 0.05 || p2 < 0.05
-            sig_idx = [sig_idx roi_i];
-
-            fprintf('%30s: age) r=%7.3f, p=%7.3f', roi_target_names{roi_i}, r1, p1);
-            fprintf('\tEM) r=%7.3f, p=%7.3f\n', r2, p2);
+    matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', ...
+        substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    
+    con_idx = 0;
+    for ci = contrast_idx
+        col = ci + 1;  % +1 for intercept
+        w = zeros(1, n_cov + 1);
+        if strcmp(corr_sign, 'neg')
+            con_idx = con_idx + 1;
+            w(col) = -1;
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.name    = [target_names{ci}, '_neg'];
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.weights = w;
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.sessrep = 'none';
+        else  % 'pos', 'both', 'all'
+            con_idx = con_idx + 1;
+            w(col) = 1;
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.name    = [target_names{ci}, '_pos'];
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.weights = w;
+            matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.sessrep = 'none';
+            if strcmp(corr_sign, 'both') || strcmp(corr_sign, 'all')
+                con_idx = con_idx + 1;
+                w(col) = -1;
+                matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.name    = [target_names{ci}, '_neg'];
+                matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.weights = w;
+                matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.sessrep = 'none';
+            end
         end
     end
-    disp(' ');
+    matlabbatch{3}.spm.stats.con.delete = 0;
 
-    % - check hemsipheric interactions -
-    if true
-        sig_idx_sort = [];
-        for roi_i = sig_idx
-            tmp_l = find(roi_target_idx_left == roi_i);
-            tmp_r = find(roi_target_idx_right == roi_i);
-            tmp_b = find(roi_target_idx_avg == roi_i);
+    matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', ...
+        substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    matlabbatch{4}.spm.stats.results.conspec.titlestr    = '';
+    matlabbatch{4}.spm.stats.results.conspec.contrasts   = 1;
+    matlabbatch{4}.spm.stats.results.conspec.threshdesc  = 'FWE';
+    matlabbatch{4}.spm.stats.results.conspec.thresh      = 0.05;
+    matlabbatch{4}.spm.stats.results.conspec.extent      = 0;
+    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
+    matlabbatch{4}.spm.stats.results.conspec.mask.none   = 1;
+    matlabbatch{4}.spm.stats.results.units               = 1;
+    matlabbatch{4}.spm.stats.results.export{1}.ps        = true;
+    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
     
-            sig_idx_sort = [sig_idx_sort tmp_l tmp_r tmp_b];
-        end
-        sig_idx_sort = unique(sig_idx_sort);
-    
-        idx_age = []; idx_h_age = []; idx_acc = []; idx_h_acc = []; 
-        tbl_h_age = []; tbl_h_acc = []; count = 0;
-        for roi_i = sig_idx_sort
-            count = count+1;
-            tmp_conn_l = squeeze(Z_surf{con_i}( seed_i, roi_target_idx_left(roi_i), : ));
-            tmp_conn_r = squeeze(Z_surf{con_i}( seed_i, roi_target_idx_right(roi_i), : ));
-            tmp_conn = [tmp_conn_l(group_idx == 1)' tmp_conn_r(group_idx == 1)'];
+    batch = matlabbatch;
+        
+    %% run batch
+    batch = matlabbatch;
 
-            tmp_hemis = [ones(1, sum(group_idx == 1)) ones(1, sum(group_idx == 1))*2];
+    spm('defaults','fmri');
+    spm_jobman('initcfg');
+    spm_jobman('run',batch);
 
-            tmp_eti = eti_ea(group_idx == 1); tmp_eti = [tmp_eti tmp_eti];
-            tmp_age = sbj_age(group_idx == 1); tmp_age = [tmp_age tmp_age];
-            tmp_acc = em_acc{6}(group_idx == 1); tmp_acc = [tmp_acc tmp_acc]; % full EM
-
-            tmp_sbj = 1:sum(group_idx == 1); tmp_sbj = [tmp_sbj tmp_sbj];
-
-            %
-            tmp_names = {'conn', 'hemis', 'age', 'acc', 'eti', 'sbj'};
-            tmp_cell = {tmp_conn', tmp_hemis', tmp_age', tmp_acc', tmp_eti', tmp_sbj'};
-            tmp_array = cell2mat(tmp_cell);
-            tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-            tmp_table.hemis = categorical(tmp_table.hemis);
-
-            % - hemisphere by age interaction -
-            lme = fitlme(tmp_table, 'conn~hemis*age+(hemis|sbj)');
-            if lme.Coefficients{3,6} < 0.05
-                idx_age = [idx_age roi_i];
-            end
-            if lme.Coefficients{4,6} < 0.05
-                idx_h_age = [idx_h_age roi_i];
-            end
-            tbl_h_age{count} = lme.Coefficients;
-            
-            % - hemisphere by acc interaction -
-            lme = fitlme(tmp_table, 'conn~hemis*acc+(hemis|sbj)');
-            if lme.Coefficients{3,6} < 0.05
-                idx_acc = [idx_acc roi_i];
-            end
-            if lme.Coefficients{4,6} < 0.05
-                idx_h_acc = [idx_h_acc roi_i];
-            end
-            tbl_h_acc{count} = lme.Coefficients;
-        end
-
-        % - print results -
-        fprintf(' -> hemispheric interaction?\n');
-        fprintf('  # main effects of age\n');
-        for i = 1:length(idx_age)
-            curr_idx = find(sig_idx_sort == idx_age(i));
-            curr_tbl = tbl_h_age{curr_idx};
-            fprintf('%30s: age) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_age(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-
-        fprintf('  # interaction effects between age and hemisphere\n');
-        for i = 1:length(idx_h_age)
-            curr_idx = find(sig_idx_sort == idx_h_age(i));
-            curr_tbl = tbl_h_age{curr_idx};
-            fprintf('%30s: age) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_h_age(i))}(5:end), ...
-                                            curr_tbl{4,2}, curr_tbl{4,3}, curr_tbl{4,5}, curr_tbl{4,4}, curr_tbl{4,6})
-        end
-        disp(' ');
-
-        fprintf('  # main effects of acc\n');
-        for i = 1:length(idx_acc)
-            curr_idx = find(sig_idx_sort == idx_acc(i));
-            curr_tbl = tbl_h_acc{curr_idx};
-            fprintf('%30s: acc) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_acc(i))}(5:end), ...
-                                            curr_tbl{3,2}, curr_tbl{3,3}, curr_tbl{3,5}, curr_tbl{3,4}, curr_tbl{3,6})
-        end
-        disp(' ');
-
-        fprintf('  # interaction effects between acc and hemisphere\n');
-        for i = 1:length(idx_h_acc)
-            curr_idx = find(sig_idx_sort == idx_h_acc(i));
-            curr_tbl = tbl_h_acc{curr_idx};
-            fprintf('%30s: acc) β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', roi_target_names{roi_target_idx_avg(idx_h_acc(i))}(5:end), ...
-                                            curr_tbl{4,2}, curr_tbl{4,3}, curr_tbl{4,5}, curr_tbl{4,4}, curr_tbl{4,6})
-        end
-        disp(' ');
-    end
-
-    % - interaction with abuse -
-    fprintf(' - interaction with abuse -\n');
-    for roi_i = sig_idx
-        data = squeeze(Z_surf{con_i}( seed_i, roi_i, : ));
-
-        % -- full EM --
-        [~, tbl, stats, ~] = anovan(data, {eti_ea, em_acc{6}}, 'continuous', [1 2], 'varnames', {'eti', 'acc'}, 'model', 'full', 'display', 'off');
-
-        % -- display results --
-        fprintf('%30s: full EM ) F=%7.3f, p=%7.3f\n', roi_target_names{roi_i}, tbl{4,6}, tbl{4,7});
-    end
+    cd(WORKING_DIRECTORY)
 end
 
+
+
+
+%% run 2nd level: condition contrast - ANOVA (2-way interaction)
+
+%%%%%%%%%%%%%%%%
+roi_idx = 1:length(roi_seed_idx);
+
+var1 = double(eti_ea == 0);  var1_name = 'eti';
+
+% var2 = sbj_age;            var2_name = 'age';
+var2 = em_acc{6};            var2_name = 'fullem';
+% var2 = em_acc{5};            var2_name = 'wherew';
+% var2 = em_acc{4};            var2_name = 'whatw';
+
+group_idx = (1:length(bhv_list)); group_name = '';
+%%%%%%%%%%%%%%%%
+
+anova_name = ['anova_N', num2str(length(bhv_list))];
+ANOVA_OUT_PATH = ['../results/glm_norm_smooth/', anova_name];
+if ~exist(ANOVA_OUT_PATH, 'dir'); mkdir(ANOVA_OUT_PATH); end
+
+for roi_i = roi_idx
+    cd(WORKING_DIRECTORY)
+
+    file_names = arrayfun(@(x) sprintf('BETA_Subject%.3d_Condition%.3d_Source%.3d.nii', x, condition_i, roi_seed_idx(roi_i)), group_idx, 'uni', 0);
+    in_dir = cellfun(@(x) fullfile(IN_PATH_FIRST, 'HPC', x), file_names, 'uni', 0);
+
+    grp_v1 = var1(group_idx);
+    grp_v2 = var2(group_idx);
+
+    main_cov  = [grp_v1; grp_v2];
+    cov_names = {var1_name, var2_name, [var1_name '#' var2_name]};
+    interact_cov = grp_v1 .* grp_v2;
+
+    out_dir = fullfile(ANOVA_OUT_PATH, cond_name{condition_i}, sprintf('interaction_%s%s#%s', group_name, var1_name, var2_name), roi_seed_names{roi_i});
+    if ~exist(out_dir, 'dir'); mkdir(out_dir); end
+
+
+    %% batch
+    n_main     = size(main_cov,     1);
+    n_interact = size(interact_cov, 1);
+    n_cov      = n_main + n_interact;
+    
+    all_cov = [main_cov; interact_cov];    
+    if ~iscell(cov_names)
+        cov_names = {cov_names};
+    end
+    
+    matlabbatch{1}.spm.stats.factorial_design.dir = {out_dir};
+    matlabbatch{1}.spm.stats.factorial_design.des.mreg.scans = in_dir(:);
+    for i = 1:n_cov
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).c     = all_cov(i, :);
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).cname = cov_names{i};
+        matlabbatch{1}.spm.stats.factorial_design.des.mreg.mcov(i).iCC   = 0;
+    end
+    matlabbatch{1}.spm.stats.factorial_design.des.mreg.incint   = 1;
+    matlabbatch{1}.spm.stats.factorial_design.cov       = struct('c',{}, 'cname',{}, 'iCFI',{}, 'iCC',{});
+    matlabbatch{1}.spm.stats.factorial_design.multi_cov = struct('files',{}, 'iCFI',{}, 'iCC',{});
+    matlabbatch{1}.spm.stats.factorial_design.masking.tm.tm_none  = 1;
+    matlabbatch{1}.spm.stats.factorial_design.masking.im          = 0;
+    matlabbatch{1}.spm.stats.factorial_design.masking.em          = {'C:\mask_directory\mask_ICV.nii'};
+    matlabbatch{1}.spm.stats.factorial_design.globalc.g_omit      = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.gmsca.gmsca_no = 1;
+    matlabbatch{1}.spm.stats.factorial_design.globalm.glonorm     = 1;
+
+    matlabbatch{2}.spm.stats.fmri_est.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', ...
+        substruct('.','val','{}',{1},'.','val','{}',{1},'.','val','{}',{1}), substruct('.','spmmat'));
+    matlabbatch{2}.spm.stats.fmri_est.write_residuals = 0;
+    matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
+
+    % Design columns: intercept(1), main(2..n_main+1), interact(n_main+2..n_cov+1)
+    matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', ...
+        substruct('.','val','{}',{2},'.','val','{}',{1},'.','val','{}',{1}), substruct('.','spmmat'));
+    
+    con_idx = 0;
+    
+    % F-contrast: jointly tests all interaction terms (n_interact df)
+    % rows = n_interact, cols = n_cov+1 (intercept + all covariates)
+    f_weights = [zeros(n_interact, n_main+1), eye(n_interact)];
+    interact_name = strjoin(cov_names(n_main+1:end), '+');
+    
+    con_idx = con_idx + 1;
+    matlabbatch{3}.spm.stats.con.consess{con_idx}.fcon.name    = ['F_' interact_name];
+    matlabbatch{3}.spm.stats.con.consess{con_idx}.fcon.weights = f_weights;
+    matlabbatch{3}.spm.stats.con.consess{con_idx}.fcon.sessrep = 'none';
+    
+    % t-contrasts: pos and neg for each interaction term individually
+    for ii = 1:n_interact
+        col = n_main + 1 + ii;   % column in design matrix (+1 for intercept)
+        w   = zeros(1, n_cov+1);
+    
+        con_idx  = con_idx + 1;
+        w(col)   = 1;
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.name    = [cov_names{n_main+ii}, '_pos'];
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.weights = w;
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.sessrep = 'none';
+    
+        con_idx  = con_idx + 1;
+        w(col)   = -1;
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.name    = [cov_names{n_main+ii}, '_neg'];
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.weights = w;
+        matlabbatch{3}.spm.stats.con.consess{con_idx}.tcon.sessrep = 'none';
+    end
+    matlabbatch{3}.spm.stats.con.delete = 0;
+
+    matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', ...
+        substruct('.','val','{}',{3},'.','val','{}',{1},'.','val','{}',{1}), substruct('.','spmmat'));
+    matlabbatch{4}.spm.stats.results.conspec.titlestr    = '';
+    matlabbatch{4}.spm.stats.results.conspec.contrasts   = 1;
+    matlabbatch{4}.spm.stats.results.conspec.threshdesc  = 'FWE';
+    matlabbatch{4}.spm.stats.results.conspec.thresh      = 0.05;
+    matlabbatch{4}.spm.stats.results.conspec.extent      = 0;
+    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
+    matlabbatch{4}.spm.stats.results.conspec.mask.none   = 1;
+    matlabbatch{4}.spm.stats.results.units               = 1;
+    matlabbatch{4}.spm.stats.results.export{1}.ps        = true;
+    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
+
+        
+    %% run batch
+    batch = matlabbatch;
+
+    spm('defaults','fmri');
+    spm_jobman('initcfg');
+    spm_jobman('run',batch);
+
+    cd(WORKING_DIRECTORY)
+end

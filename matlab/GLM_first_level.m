@@ -34,6 +34,7 @@ n_subjects = length(sbj_idx);
 
 
 % GLM file setting
+CASE_NUM = '01'; % contrast set identifier (example; corresponds to contrast_weight.xlsx)
 glm_name = sprintf('1st_level_N%d_CASE%s_txt', n_subjects, CASE_NUM);
 
 OUT_PATH = ['../results/glm_norm_smooth/', glm_name]; % standard space
