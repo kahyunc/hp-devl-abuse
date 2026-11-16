@@ -1,10 +1,11 @@
 # Hippocampal Memory Development and Emotional Abuse
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24272624.svg)](https://doi.org/10.5281/zenodo.24272624)
+[![Code: MIT](https://img.shields.io/badge/Code-MIT-yellow.svg)](LICENSE)
+[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC_BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 
 This repository contains the analysis code and data resources for the paper:
 
 Choi, K., Min, J. J., Rah, Y. J., Kim, J. Y., Choi, S. Y., Hong, S. H., Jang, Y., Han, S., Lee, K. H., Kim, J.-W., Chung, G. H., Chung, D., Cha, J., Lee, S. A. (accepted). **Functional development of spatiotemporal hippocampal memory binding in adolescence and its disruption in emotional abuse**. *Nature Communications*.
-
-<br>
 
 ## Requirements
 
@@ -13,8 +14,6 @@ Choi, K., Min, J. J., Rah, Y. J., Kim, J. Y., Choi, S. Y., Hong, S. H., Jang, Y.
 - **SPM12**: fMRI preprocessing and GLM analysis
 - **FreeSurfer**: hippocampal segmentation
 - **CONN**: functional connectivity analysis
-
-<br>
 
 ## Code
 
@@ -44,13 +43,14 @@ The task was presented using MATLAB R2020b and Psychtoolbox-3.
 - `matlab/connectivity_script.m`: CONN batch setup and first-level analysis
 - `matlab/connectivity_analysis.m`: connectivity statistics and encoding-window sensitivity
 
-<br>
-
 ## Data
 
-Source data, trial-level behavioral accuracy, and group-level statistical maps are available in `data/`. See the `data/README.md`.
+Source data, trial-level behavioral accuracy, and group-level statistical maps are available in `data/`. See `data/README.md` for details.
 
-<br>
+## License
+
+Code is released under the MIT License (`LICENSE`).
+Data files are released under CC BY 4.0.
 
 ## Contact
 
