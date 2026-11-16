@@ -7,7 +7,7 @@
 
 % load subject list
 subject_path = 'C:\subject_info_directory';
-bhv_nums = load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'num_sbj'
+load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'num_sbj'
 
 % behavior
 load(fullfile(subject_path, 'behavioral_data.mat')); % 'em_acc', 'sbj_age', 'sbj_sex'
@@ -21,7 +21,7 @@ sbj_eti = table2struct(sbj_eti); % ALL, GT, PA, EA, Q1~21
 eti_ea = [sbj_eti.EA];
 
 
-%% Participant demographics (Non-abused, Abused)
+%% Participant demographics (No emotional abuse, Emotional abuse)
 
 tmp_group = (eti_ea > 0);
 
@@ -38,7 +38,7 @@ disp('<< Participant demographics >>');
 % age
 [~,p,~,stats] = ttest2(tmp_list{1}(tmp_group==0), tmp_list{1}(tmp_group==1));
 fprintf('%8s: non - %.2f(%.2f), abused - %.2f(%.2f), T=%.3f, p=%.3f\n', tmp_name{1}, ...
-    nanmean(tmp_list{1}(tmp_group == 0)), nanstd(tmp_list{1}(tmp_group == 0)), nanmean(tmp_list{1}(tmp_group == 1)), nanstd(tmp_list{1}(tmp_group == 1)), ...
+    mean(tmp_list{1}(tmp_group == 0), 'omitnan'), std(tmp_list{1}(tmp_group == 0), 0, 'omitnan'), mean(tmp_list{1}(tmp_group == 1), 'omitnan'), std(tmp_list{1}(tmp_group == 1), 0, 'omitnan'), ...
     stats.tstat, p);
 
 % sex
@@ -51,7 +51,7 @@ fprintf('%8s: non - %.2f(%.2f), abused - %.2f(%.2f), T=%.3f, p=%.3f\n', tmp_name
 for i = 3:6
     [~,p,~,stats] = ttest2(tmp_list{i}(tmp_group==0), tmp_list{i}(tmp_group==1));
     fprintf('%8s: non - %.2f(%.2f), abused - %.2f(%.2f), T=%.3f, p=%.3f\n', tmp_name{i}, ...
-        nanmean(tmp_list{i}(tmp_group == 0)), nanstd(tmp_list{i}(tmp_group == 0)), nanmean(tmp_list{i}(tmp_group == 1)), nanstd(tmp_list{i}(tmp_group == 1)), ...
+        mean(tmp_list{i}(tmp_group == 0), 'omitnan'), std(tmp_list{i}(tmp_group == 0), 0, 'omitnan'), mean(tmp_list{i}(tmp_group == 1), 'omitnan'), std(tmp_list{i}(tmp_group == 1), 0, 'omitnan'), ...
         stats.tstat, p);
 end
 disp(' ');
@@ -66,7 +66,7 @@ disp('<< Participant demographics: family environment >>');
 for i = 34:42
     [~,p,~,stats] = ttest2(sbj_svy{i}(tmp_group==0), sbj_svy{i}(tmp_group==1));
     fprintf('%12s: non - %.2f(%.2f), abused - %.2f(%.2f), T=%.3f, p=%.3f\n', svy_label{i}, ...
-        nanmean(sbj_svy{i}(tmp_group == 0)), nanstd(sbj_svy{i}(tmp_group == 0)), nanmean(sbj_svy{i}(tmp_group == 1)), nanstd(sbj_svy{i}(tmp_group == 1)), ...
+        mean(sbj_svy{i}(tmp_group == 0), 'omitnan'), std(sbj_svy{i}(tmp_group == 0), 0, 'omitnan'), mean(sbj_svy{i}(tmp_group == 1), 'omitnan'), std(sbj_svy{i}(tmp_group == 1), 0, 'omitnan'), ...
         stats.tstat, p);
 end
 disp(' ');

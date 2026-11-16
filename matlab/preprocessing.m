@@ -40,6 +40,7 @@ for sbj_i = 1:length(sbj_list)
         end
 
         %% preprocessing setup
+        clear matlabbatch
 
         func = func_list(:);
         anat = {file_name_t1};
@@ -53,6 +54,7 @@ for sbj_i = 1:length(sbj_list)
         tr = split(tr,{'=','m'});
         tr = str2double(tr{2}) / 1000;
         
+        spm_path = spm('Dir');
         vox_size = header.PixelDimensions(1); 
         smoothing_factor = 8;
         
@@ -175,6 +177,3 @@ for sbj_i = 1:length(sbj_list)
     end
 end
 fprintf('\nfailed sbj_i: %d\n\n', fail_list);
-
-
-

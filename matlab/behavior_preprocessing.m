@@ -25,7 +25,7 @@ svy_list = sbj_data.Properties.VariableNames;
 svy_list = svy_list(2:end);
 
 for svy_i = 1:length(svy_list)
-    sbj_svy{svy_i} = eval(['sbj_data.', svy_list{svy_i}]);
+    sbj_svy{svy_i} = sbj_data.(svy_list{svy_i});
 end
 
 % SES: no response -> NaN
@@ -66,6 +66,7 @@ for sbj_i = 1:length(sbj_nums)
         bhv.expInfo.context = Data.trial.trialinfo.context;
         bhv.expInfo.animal = Data.trial.trialinfo.animal;
         bhv.expInfo.location = Data.trial.trialinfo.location;
+        interf_type = ~isfield(Data.trial.trialinfo.interference, 'back');
         if ~interf_type
             bhv.expInfo.inter_back = Data.trial.trialinfo.interference.back;
             bhv.expInfo.inter_stim = Data.trial.trialinfo.interference.stim;
@@ -142,16 +143,16 @@ for sbj_i = 1:length(sbj_nums)
                 where_err_animal = [where_err_animal what_ans(block_i, fail_event)];
             end
         end
-        trial_acc = [what_acc_list'; where_acc_list'; ww_acc_list'; nanmean(enact.animalAcc, 2)'; nanmean(enact.locationAcc, 2)'; ...
-                     nanmean((enact.animalAcc + enact.locationAcc) == 2, 2)'];
+        trial_acc = [what_acc_list'; where_acc_list'; ww_acc_list'; mean(enact.animalAcc, 2, 'omitnan')'; mean(enact.locationAcc, 2, 'omitnan')'; ...
+                     mean((enact.animalAcc + enact.locationAcc) == 2, 2, 'omitnan')'];
         
-        what_acc = nanmean(what_acc_list);
-        where_acc = nanmean(where_acc_list);
-        ww_acc = nanmean(ww_acc_list);
+        what_acc = mean(what_acc_list, 'omitnan');
+        where_acc = mean(where_acc_list, 'omitnan');
+        ww_acc = mean(ww_acc_list, 'omitnan');
         
-        what_when_acc = nanmean(enact.animalAcc, 'all'); 
-        where_when_acc = nanmean(enact.locationAcc, 'all');
-        www_acc = nanmean((enact.animalAcc + enact.locationAcc) == 2, 'all');
+        what_when_acc = mean(enact.animalAcc, 'all', 'omitnan'); 
+        where_when_acc = mean(enact.locationAcc, 'all', 'omitnan');
+        www_acc = mean((enact.animalAcc + enact.locationAcc) == 2, 'all', 'omitnan');
 
         em_acc = [what_acc where_acc ww_acc what_when_acc where_when_acc www_acc];
         
@@ -178,6 +179,10 @@ disp('preprocessing done');
 
 
 %% organize behavioral data
+% Requires the included subject list after run-level QC.
+
+subject_path = 'C:\subject_info_directory';
+load(fullfile(subject_path, 'subject_list_for_GLM.mat'), 'bhv_list');
 
 tmp_em_acc = {};
 for sbj_i = 1:length(bhv_list)

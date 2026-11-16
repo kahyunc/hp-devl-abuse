@@ -41,16 +41,14 @@ OUT_PATH = ['../results/glm_norm_smooth/', glm_name]; % standard space
 target_reg_exp = '.*swraf.*';
 % OUT_PATH = ['../results/glm_indiv_rough/', glm_name]; % individual space (without normalization)
 % target_reg_exp = '\<raf.*';
-
 if ~exist(OUT_PATH, 'dir'); mkdir(OUT_PATH); end
-
 
 % contrast weight setting
 con_names = {'enc1', 'ret1', 'enc-fix1', 'ret-fix1', 'enc-ctrl1', 'ret-ctrl1', 'enc-ctrl-fix1', 'ret-ctrl-fix1', 'reenact1', 'interfere1', ...
              'enc2', 'ret2', 'enc-fix2', 'ret-fix2', 'enc-ctrl2', 'ret-ctrl2', 'enc-ctrl-fix2', 'ret-ctrl-fix2', 'reenact2', 'interfere2', ...
              'ctrl-enc', 'ctrl-ret'};
 
-xls_weights = xlsread(fullfile(IN_PATH_CONTRAST, 'contrast_weight.xlsx'));
+xls_weights = readmatrix(fullfile(IN_PATH_CONTRAST, 'contrast_weight.xlsx'));
 xls_weights(isnan(xls_weights)) = 0;
 
 con_weights = arrayfun(@(num) xls_weights(num, :), 1:size(xls_weights, 1), 'uni', 0);
@@ -64,14 +62,12 @@ load(file_name_qc); % 'move_all', 'rot_all'
 
 error_sbj = []; error_run = [];
 for sbj_i = 1:length(sbj_nums)
-
     % check if rejected sbj
     if ~isempty(find(sbj_reject_all == sbj_nums(sbj_i), 1))
         continue;
     end
     
     for run_i = 1:4   
-        
         % check if rejected run
         if ~isempty(find(sbj_reject_run == sbj_nums(sbj_i), 1))
             if ~isempty(find(reject_run{find(sbj_reject_run == sbj_nums(sbj_i), 1)} == run_i, 1))
@@ -107,6 +103,7 @@ for sbj_i = 1:length(sbj_nums)
 
 
             %% batch
+            clear matlabbatch
             if ~iscell(out_path)
                 out_dir = {out_path};
             end
@@ -114,7 +111,6 @@ for sbj_i = 1:length(sbj_nums)
             reg_mat = {task_reg};
             reg_txt = cont_reg;
             p = 0.05;
-
             file_name_mask = 'C:\mask_directory\mask_ICV.nii';
             
             %
@@ -126,17 +122,17 @@ for sbj_i = 1:length(sbj_nums)
             
             %
             if length(func) ~= 1
-                for run_i = 1:length(func)
-                    matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).scans = func{run_i};
-                    matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).multi = {reg_mat{run_i}};
+                for sess_i = 1:length(func)
+                    matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).scans = func{sess_i};
+                    matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).multi = {reg_mat{sess_i}};
                     if ~isempty(reg_txt)
-                        matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).multi_reg = {reg_txt{run_i}};
+                        matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).multi_reg = {reg_txt{sess_i}};
                     else
-                        matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).multi_reg = {''};
+                        matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).multi_reg = {''};
                     end
-                    matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {}, 'orth', {});
-                    matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).regress = struct('name', {}, 'val', {});
-                    matlabbatch{1}.spm.stats.fmri_spec.sess(run_i).hpf = 128;
+                    matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {}, 'orth', {});
+                    matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).regress = struct('name', {}, 'val', {});
+                    matlabbatch{1}.spm.stats.fmri_spec.sess(sess_i).hpf = 128;
                 end
             else
                 matlabbatch{1}.spm.stats.fmri_spec.sess.scans = func{1};

@@ -1,73 +1,49 @@
-## Hippocampal Development and Effects of Emotional Abuse
+# Hippocampal Memory Development and Emotional Abuse
 
-This repository contains the code used to collect data and generate analyses for the following paper:
+Code and data accompanying:
 
-*Choi, K., Min, J.J., Rah, Y.J., Kim, J.Y., ..., Lee, S.A. (in prep). 
-Functional Development of Spatiotemporal Hippocampal Memory Binding in Adolescence and Its Alteration by Emotional Abuse.*
+Choi, K., Min, J. J., Rah, Y. J., Kim, J. Y., Choi, S. Y., Hong, S. H., Jang, Y., Han, S., Lee, K. H., Kim, J.-W., Chung, G. H., Chung, D., Cha, J., Lee, S. A. (accepted). Functional development of spatiotemporal hippocampal memory binding in adolescence and its disruption in emotional abuse. *Nature Communications*.
 
-<br>
+## Requirements
 
-## Prerequisites
+- **MATLAB R2024a** or later, with Statistics and Machine Learning Toolbox and Image Processing Toolbox
+- **Psychtoolbox-3**: task presentation
+- **SPM12**: fMRI preprocessing and GLM analysis
+- **FreeSurfer**: hippocampal segmentation
+- **CONN**: functional connectivity analysis
 
-Before running the scripts, ensure you have the following software and toolboxes installed:
-
-* **MATLAB R2024a** (or later)
-* **Psychophysics Toolbox Version 3 (PTB-3)**: For task presentation
-* **SPM12**: For fMRI preprocessing and GLM analysis
-* **FreeSurfer**: For structural segmentation (Hippocampal subfields)
-* **CONN Toolbox**: For functional connectivity analysis
-
-<br>
-
-## Scripts details
+## Code
 
 ### 1. Episodic memory task
-*The task was presented using MATLAB R2020b (MathWorks, USA) with Psychophysics Toolbox Version 3.*
 
-- ``matlab/TASK_episodic_memory.m``
+The task was presented using MATLAB R2020b and Psychtoolbox-3.
 
-<br>
+- [TASK_episodic_memory.m](matlab/TASK_episodic_memory.m): task presentation
 
 ### 2. Behavioral analysis
 
-- ``matlab/behavior_preprocessing.m``: preprocess raw behavioral data
+- [behavior_preprocessing.m](matlab/behavior_preprocessing.m): behavioral preprocessing
+- [behavior_demographics.m](matlab/behavior_demographics.m): demographics and survey measures
+- [behavior_memory.m](matlab/behavior_memory.m): episodic memory performance and error patterns
 
-- ``matlab/behavior_demographics.m``: demographics (age, sex, survey)
+### 3. fMRI analysis: GLM and ROIs
 
-- ``matlab/behavior_memory.m``: episodic memory performance
-
-<br>
-
-### 3. fMRI analysis: GLM
-*Structural and functional MRI data were preprocessed using SPM12 and FreeSurfer.*
-
-- ``matlab/preprocessing.m``: fMRI preprocessing pipeline
-
-- ``matlab/generate_regressors.m``: regressors for design matrix
-
-- ``matlab/extract_ROIs.m``: ROI extraction from FreeSurfer output
-<br>
-
-*General Linear Model (GLM) analyses were done using SPM12.*
-
-- ``matlab/GLM_first_level.m``: GLM individual level analysis
-
-- ``matlab/GLM_second_level.m``: GLM group level analysis
-
-- ``matlab/ROI_activation_analysis.m``: ROI-based activation analysis
-
-<br>
+- [preprocessing.m](matlab/preprocessing.m): fMRI preprocessing
+- [generate_regressors.m](matlab/generate_regressors.m): trial- and run-level task regressors
+- [extract_ROIs.m](matlab/extract_ROIs.m): ROI extraction from FreeSurfer output
+- [GLM_first_level.m](matlab/GLM_first_level.m): first-level GLM analysis
+- [GLM_second_level.m](matlab/GLM_second_level.m): group-level GLM analysis
+- [ROI_activation_analysis.m](matlab/ROI_activation_analysis.m): hippocampal activation, longitudinal peak position, retrieval similarity, and volume analyses
 
 ### 4. fMRI analysis: connectivity
-*Seed-based functional connectivity analyses were done using the CONN toolbox.*
 
-- ``matlab/connectivity_script.m``: seed-based functional connectivity batch script for CONN toolbox
+- [connectivity_script.m](matlab/connectivity_script.m): CONN batch setup and first-level analysis
+- [connectivity_analysis.m](matlab/connectivity_analysis.m): connectivity statistics and encoding-window sensitivity
 
-- ``matlab/connectivity_analysis.m``: statistical analysis of connectivity
+## Data
 
-<br>
+Source data, trial-level behavioral accuracy, and group-level statistical maps are available in [data/](data/). See the [data description](data/README.md).
 
 ## Contact
-All scripts were written by **Kahyun Choi** (kahyu3@snu.ac.kr).
 
-For any questions or issues, please contact via email.
+Kahyun Choi (kahyu3@snu.ac.kr).

@@ -7,15 +7,19 @@
 
 % load subject list
 subject_path = 'C:\subject_info_directory';
-bhv_nums = load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'num_sbj'
+load(fullfile(subject_path, 'subject_list_for_GLM.mat')); % 'bhv_list', 'sbj_list', 'sbj_nums', 'num_sbj'
 
 % load ROI activation files
-dir_seg = 'C:\ROI_data_directory';
-load(fullfile(dir_seg, sprintf('metric_neural_N%d.mat', num_sbj))); % metric_list_enc, flag_name_mri, roi_name_all
+dir_metric = 'C:\ROI_metric_directory';
+dir_seg = 'C:\native_ROI_directory';
+dir_beta = 'C:\native_beta_directory';
+load(fullfile(dir_metric, sprintf('metric_neural_N%d.mat', num_sbj))); % metric_list_enc, flag_name_mri, roi_name_all
 disp('Metric data loaded');
 
 % behavior
 load(fullfile(subject_path, 'behavioral_data.mat')); % 'em_acc', 'sbj_age', 'sbj_sex'
+
+load(fullfile(subject_path, 'survey_data.mat'), 'sbj_svy', 'svy_label');
 
 % ETI
 dir_survey = fullfile(subject_path, 'ETI_survey.xlsx');
@@ -27,7 +31,6 @@ eti_ea = [sbj_eti.EA];
 
 %% hippocampal activation: group difference
 
-%%%%%%%%%%%%%%%%
 roi_idx_L = [ 1 4 7 ]; % Hippocampus, ant, post
 roi_idx_R = [ 18 21 24 ];
 roi_idx_B = [ 35 38 41 ];
@@ -37,8 +40,9 @@ con_i = 2; % 2:control
 flag_i = 1; % 1:all
 
 group_idx = (eti_ea > 0);
+tmp_group = group_idx;
+activation_ylim = [-2.5 3];
 plot_color = [0.3 0.3 0.3; 223/255 153/255 153/255];
-%%%%%%%%%%%%%%%%
 
 %
 fig_draw = true;
@@ -48,7 +52,7 @@ if fig_draw
 
     tmp_category = categorical(group_idx, logical([0 1]), {'non-abused', 'abused'});
 
-    % - subfields -
+    % - subregions -
     s_names = {'Ant', 'Post'};
     for s_i = 1:2
         subplot(1,6,[2*(s_i-1)+1 2*(s_i)]);
@@ -63,7 +67,6 @@ if fig_draw
             fig_box(g_i).MarkerStyle = 'none';
             fig_box(g_i).LineWidth = 0.8;
         end
-    
         fig_dot = []; dot_density = 3; % 0, 1, 2, 3
         bar_width_half = 0.3 - dot_density * 0.07;
     
@@ -74,25 +77,22 @@ if fig_draw
             y_draw = y_draw(~isnan(y_draw));
             y_unique = unique(y_draw);
             num_repeated = arrayfun(@(x) sum(x==y_draw),y_unique);
-            
             x_draw = arrayfun(@(x) linspace(-bar_width_half, bar_width_half, x - mod(x,2)),num_repeated,'UniformOutput',false);
             x_draw(mod(num_repeated,2)==1) = cellfun(@(x) [x 0], x_draw(mod(num_repeated,2)==1),'UniformOutput',false);
             x_draw = cell2mat(reshape(x_draw,1,[])) + graph_i/2 + 0.05;
         end
-    
         yline(0, 'k:')
-        ylim([-2.5 3]); ylabel('beta coefficient');
+        ylim(activation_ylim); ylabel('beta coefficient');
         xticklabels(s_names{s_i});
         [~, p] = ttest2(data_all(tmp_group == 0), data_all(tmp_group > 0));
     
-        %%% Cohen's d %%%
         c_stats = meanEffectSize(data_all(tmp_group == 0), data_all(tmp_group > 0), 'Effect', 'Cohen');
         fprintf('\n%s: Cohens d = %.3f\n', s_names{s_i}, c_stats.Effect);
         
         hold off
         box off
-        set(gca,'LineWidth',0.8);
-        set(gca,'FontName','Helvetica','FontSize',6, 'FontWeight','bold')
+        set(gca,'LineWidth',0.6);
+        set(gca,'FontName','Arial','FontSize',6, 'FontWeight','normal')
 
         if s_i > 1
             ax = gca;
@@ -101,19 +101,18 @@ if fig_draw
     end
 end
 
-
 % ---------- statistics ---------- %
 stats_on = true;
 if stats_on
     fprintf('<< hippocampal activation >>\n');
-    fprintf(' - non-abused -\n');
+    fprintf(' - no emotional abuse -\n');
     for i = 1:3
         [~,p,~,stats] = ttest(metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(1)}(group_idx == 0));
         fprintf('%10s: T(%d)=%.3f, p=%.3f\n', roi_name_all{roi_idx_list{i}(1)}, stats.df, stats.tstat, p);
     end
     disp(' ');
     
-    fprintf(' - abused -\n');
+    fprintf(' - emotional abuse -\n');
     for i = 1:3
         [~,p,~,stats] = ttest(metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(1)}(group_idx == 1));
         fprintf('%10s: T(%d)=%.3f, p=%.3f\n', roi_name_all{roi_idx_list{i}(1)}, stats.df, stats.tstat, p);
@@ -128,7 +127,7 @@ if stats_on
     disp(' ');
     
     fprintf('<< hp subregion activation >>\n');
-    fprintf(' - non-abused -\n');
+    fprintf(' - no emotional abuse -\n');
     for i = 1:3
         for j = 2:3
             [~,p,~,stats] = ttest(metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(j)}(group_idx == 0));
@@ -137,7 +136,7 @@ if stats_on
     end
     disp(' ');
     
-    fprintf(' - abused -\n');
+    fprintf(' - emotional abuse -\n');
     for i = 1:3
         for j = 2:3
             [~,p,~,stats] = ttest(metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(j)}(group_idx == 1));
@@ -156,21 +155,27 @@ if stats_on
     disp(' ');
 end
 
+% ---------- paired comparison ---------- %
+for g_i = 0:1
+    for hemis_i = 1:3
+        ant_beta = metric_list_enc{con_i}{flag_i}{roi_idx_list{hemis_i}(2)};
+        post_beta = metric_list_enc{con_i}{flag_i}{roi_idx_list{hemis_i}(3)};
+        [~, p, ~, stats] = ttest(ant_beta(group_idx == g_i), post_beta(group_idx == g_i));
+        fprintf('group %d, hemisphere %d, Ant vs Post: t(%d)=%.3f, p=%.4f\n', ...
+            g_i, hemis_i, stats.df, stats.tstat, p);
+    end
+end
 
 % ---------- Linear mixed-effects model ---------- %
 lme_analysis = true;
 if lme_analysis
     tmp_beta = [metric_list_enc{2}{1}{roi_idx_list{1}(1)} metric_list_enc{2}{1}{roi_idx_list{2}(1)}];
     tmp_type = [ones(1, length(group_idx)) ones(1, length(group_idx))*2];
-
     tmp_age = sbj_age; tmp_age = [tmp_age tmp_age];
     tmp_sex = double(sbj_sex); tmp_sex = [tmp_sex tmp_sex];
     tmp_acc = em_acc{6}; tmp_acc = [tmp_acc tmp_acc]; % full EM
     tmp_eti = eti_ea; tmp_eti = [tmp_eti tmp_eti]; % continuous
-
     tmp_sbj = 1:length(group_idx); tmp_sbj = [tmp_sbj tmp_sbj];
-
-    %
     tmp_names = {'beta', 'hemis', 'age', 'sex', 'acc', 'eti', 'sbj'};
     tmp_cell = {tmp_beta', tmp_type', tmp_age', tmp_sex', tmp_acc', tmp_eti', tmp_sbj'};
     tmp_array = cell2mat(tmp_cell);
@@ -189,7 +194,7 @@ if lme_analysis
             tmp = '* ';
         end
         fprintf('%2s%18s: β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', tmp, lme.Coefficients{i,1}, ...
-            lme.Coefficients(i,2), lme.Coefficients(i,3), double(lme.Coefficients(i,5)), lme.Coefficients(i,4), lme.Coefficients(i,6))
+            lme.Coefficients{i,2}, lme.Coefficients{i,3}, double(lme.Coefficients{i,5}), lme.Coefficients{i,4}, lme.Coefficients{i,6})
     end
 end
 
@@ -197,7 +202,6 @@ end
 
 %% hippocampal activation (subregion): non-abused
 
-%%%%%%%%%%%%%%%%
 roi_idx_L = [ 1 4 7 ]; % Hippocampus, ant, post
 roi_idx_R = [ 18 21 24 ];
 roi_idx_B = [ 35 38 41 ];
@@ -208,13 +212,12 @@ flag_i = 1; % 1:all
 hemis_i = 3; % 3:bilateral
 
 group_idx = (eti_ea > 0);
-%%%%%%%%%%%%%%%%
 
 % ---------- statistics ---------- %
 stats_on = true;
 if stats_on
     fprintf('<< hippocampal correlation w/ age >>\n');
-    fprintf(' - non-abused -\n');
+    fprintf(' - no emotional abuse -\n');
     for i = 1:3
         for j = 1:3
             tmp_data = metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(j)};
@@ -231,25 +234,20 @@ lme_analysis = true;
 if lme_analysis            
     tmp_beta = arrayfun(@(x) metric_list_enc{2}{1}{x}, roi_idx_list{hemis_i}(2:3), 'uni', 0); % enc-ctrl, all
     tmp_beta = [tmp_beta{1}(group_idx == 0) tmp_beta{2}(group_idx == 0)];
-
     tmp_type = [ones(1, sum(group_idx == 0)) ones(1, sum(group_idx == 0))*2];
-
     tmp_age = sbj_age(group_idx == 0); tmp_age = [tmp_age tmp_age];    
     tmp_sex = double(sbj_sex(group_idx == 0)); tmp_sex = [tmp_sex tmp_sex];
     tmp_acc = em_acc{6}(group_idx == 0); tmp_acc = [tmp_acc tmp_acc]; % full EM
     tmp_eti = eti_ea(group_idx == 0); tmp_eti = [tmp_eti tmp_eti]; % continuous
-
     tmp_sbj = 1:sum(group_idx == 0); tmp_sbj = [tmp_sbj tmp_sbj];
-
-    %
-    tmp_names = {'beta', 'subfield', 'age', 'sex', 'acc', 'eti', 'sbj'};
+    tmp_names = {'beta', 'subregion', 'age', 'sex', 'acc', 'eti', 'sbj'};
     tmp_cell = {tmp_beta', tmp_type', tmp_age', tmp_sex', tmp_acc', tmp_eti', tmp_sbj'};
     tmp_array = cell2mat(tmp_cell);
     tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-    tmp_table.subfield = categorical(tmp_table.subfield);
+    tmp_table.subregion = categorical(tmp_table.subregion);
 
     %
-    lme = fitlme(tmp_table, 'beta~subfield*age+(1|sbj)')
+    lme = fitlme(tmp_table, 'beta~subregion*age+(1|sbj)')
     anova(lme)
 
     % - print results
@@ -260,14 +258,13 @@ if lme_analysis
             tmp = '* ';
         end
         fprintf('%2s%18s: β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', tmp, lme.Coefficients{i,1}, ...
-            lme.Coefficients(i,2), lme.Coefficients(i,3), double(lme.Coefficients(i,5)), lme.Coefficients(i,4), lme.Coefficients(i,6))
+            lme.Coefficients{i,2}, lme.Coefficients{i,3}, double(lme.Coefficients{i,5}), lme.Coefficients{i,4}, lme.Coefficients{i,6})
     end
 end
 
 
 %% hippocampal activation (subregion): abused
 
-%%%%%%%%%%%%%%%%
 roi_idx_L = [ 1 4 7 ]; % Hippocampus, ant, post
 roi_idx_R = [ 18 21 24 ];
 roi_idx_B = [ 35 38 41 ];
@@ -278,13 +275,12 @@ flag_i = 1; % 1:all
 hemis_i = 3; % 3:bilateral
 
 group_idx = (eti_ea > 0);
-%%%%%%%%%%%%%%%%
 
 % ---------- stats ---------- %
 stats_on = true;
 if stats_on
     fprintf('<< hippocampal correlation w/ age >>\n');
-    fprintf(' - abused -\n');
+    fprintf(' - emotional abuse -\n');
     for i = 1:3
         for j = 1:3
             tmp_data = metric_list_enc{con_i}{flag_i}{roi_idx_list{i}(j)};
@@ -295,31 +291,25 @@ if stats_on
     disp(' ');
 end
 
-
 % ---------- Linear mixed-effects model ---------- %
 lme_analysis = true;
 if lme_analysis            
     tmp_beta = arrayfun(@(x) metric_list_enc{2}{1}{x}, roi_idx_list{hemis_i}(2:3), 'uni', 0); % enc-ctrl, all
     tmp_beta = [tmp_beta{1}(group_idx == 1) tmp_beta{2}(group_idx == 1)];
-
     tmp_type = [ones(1, sum(group_idx == 1)) ones(1, sum(group_idx == 1))*2];
-
     tmp_age = sbj_age(group_idx == 1); tmp_age = [tmp_age tmp_age];
     tmp_sex = double(sbj_sex(group_idx == 1)); tmp_sex = [tmp_sex tmp_sex];
     tmp_acc = em_acc{6}(group_idx == 1); tmp_acc = [tmp_acc tmp_acc]; % full EM
     tmp_eti = eti_ea(group_idx == 1); tmp_eti = [tmp_eti tmp_eti]; % continuous
-
     tmp_sbj = 1:sum(group_idx == 1); tmp_sbj = [tmp_sbj tmp_sbj];
-
-    %
-    tmp_names = {'beta', 'subfield', 'age', 'sex', 'acc', 'eti', 'sbj'};
+    tmp_names = {'beta', 'subregion', 'age', 'sex', 'acc', 'eti', 'sbj'};
     tmp_cell = {tmp_beta', tmp_type', tmp_age', tmp_sex', tmp_acc', tmp_eti', tmp_sbj'};
     tmp_array = cell2mat(tmp_cell);
     tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-    tmp_table.subfield = categorical(tmp_table.subfield);
+    tmp_table.subregion = categorical(tmp_table.subregion);
     
     %
-    lme = fitlme(tmp_table, 'beta~subfield*age+(1|sbj)')
+    lme = fitlme(tmp_table, 'beta~subregion*age+(1|sbj)')
     anova(lme)
 
     % - print results
@@ -330,14 +320,13 @@ if lme_analysis
             tmp = '* ';
         end
         fprintf('%2s%18s: β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', tmp, lme.Coefficients{i,1}, ...
-            lme.Coefficients(i,2), lme.Coefficients(i,3), double(lme.Coefficients(i,5)), lme.Coefficients(i,4), lme.Coefficients(i,6))
+            lme.Coefficients{i,2}, lme.Coefficients{i,3}, double(lme.Coefficients{i,5}), lme.Coefficients{i,4}, lme.Coefficients{i,6})
     end
 end
 
 
 %% hippocampal activation (subregion): abuse interaction
 
-%%%%%%%%%%%%%%%%
 roi_idx_L = [ 1 4 7 ]; % Hippocampus, ant, post
 roi_idx_R = [ 18 21 24 ];
 roi_idx_B = [ 35 38 41 ];
@@ -348,32 +337,26 @@ flag_i = 1; % 1:all
 hemis_i = 3; % 3:bilateral
 
 group_idx = (eti_ea > 0);
-%%%%%%%%%%%%%%%%
 
 % ---------- Linear mixed-effects model ---------- %
 lme_analysis = true;
 if lme_analysis            
     tmp_beta = arrayfun(@(x) metric_list_enc{2}{1}{x}, roi_idx_list{hemis_i}(2:3), 'uni', 0); % enc-ctrl, all
-    tmp_beta = [tmp_beta{1} tmp_beta{2} tmp_beta{3}];
-
+    tmp_beta = [tmp_beta{1} tmp_beta{2}];
     tmp_type = [ones(1, length(group_idx)) ones(1, length(group_idx))*2];
-
     tmp_age = sbj_age; tmp_age = [tmp_age tmp_age];
     tmp_sex = double(sbj_sex); tmp_sex = [tmp_sex tmp_sex];
     tmp_acc = em_acc{6}; tmp_acc = [tmp_acc tmp_acc]; % full EM
     tmp_eti = eti_ea; tmp_eti = [tmp_eti tmp_eti]; % continuous
-
     tmp_sbj = 1:length(group_idx); tmp_sbj = [tmp_sbj tmp_sbj];
-
-    %
-    tmp_names = {'beta', 'subfield', 'age', 'sex', 'acc', 'eti', 'sbj'};
+    tmp_names = {'beta', 'subregion', 'age', 'sex', 'acc', 'eti', 'sbj'};
     tmp_cell = {tmp_beta', tmp_type', tmp_age', tmp_sex', tmp_acc', tmp_eti', tmp_sbj'};
     tmp_array = cell2mat(tmp_cell);
     tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-    tmp_table.subfield = categorical(tmp_table.subfield);
+    tmp_table.subregion = categorical(tmp_table.subregion);
     
     %
-    lme = fitlme(tmp_table, 'beta~subfield*age*eti+(1|sbj)')
+    lme = fitlme(tmp_table, 'beta~subregion*age*eti+(1|sbj)')
     tbl = anova(lme)
 
     % - print results
@@ -384,16 +367,15 @@ if lme_analysis
             tmp = '* ';
         end
         fprintf('%2s%18s: β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', tmp, lme.Coefficients{i,1}, ...
-            lme.Coefficients(i,2), lme.Coefficients(i,3), double(lme.Coefficients(i,5)), lme.Coefficients(i,4), lme.Coefficients(i,6))
+            lme.Coefficients{i,2}, lme.Coefficients{i,3}, double(lme.Coefficients{i,5}), lme.Coefficients{i,4}, lme.Coefficients{i,6})
     end
 end
 
 
 %% relative activation of subregions
 
-%%%%%%%%%%%%%%%%
-hp_index = [ 1 17 33 ];
-sub_index = [ 4 7 8 9 10 ; 20 23 24 25 26 ; 36 39 40 41 42 ];
+hp_index = [ 1 18 35 ];
+sub_index = [ 4 7 ; 21 24 ; 38 41 ];
 roi_idx = [ 1 2 ];
 
 roi_idx_L = [ 1 4 7 ]; % Hippocampus, ant, post
@@ -407,10 +389,11 @@ hemis_i = 3; % 3:bilateral
 
 group_idx = (eti_ea > 0);
 plot_color = [0.3 0.3 0.3; 223/255 153/255 153/255];
-%%%%%%%%%%%
+
+relative_ylim = [-0.1 4.8];
 
 % rank ratio
-sub_sort = cell(1, 3); sub_rank = cell(1, 3); hp_sort = cell(1, 3); hp_rank = cell(1, 3);
+sub_rank = cell(1, 3); hp_rank = cell(1, 3); sub_relative = cell(1, 3);
 for hemis_i = 1:3
     hp_rank{hemis_i} = tiedrank(metric_list_enc{con_i}{flag_i}{hp_index(hemis_i)});
 
@@ -421,6 +404,14 @@ for hemis_i = 1:3
     sub_relative{hemis_i} = cellfun(@(x) x ./ hp_rank{hemis_i}, sub_rank{hemis_i}, 'uni', 0);
 end
 
+
+% ---------- group comparison ---------- %
+hemis_i = 3;
+for roi_i = 1:2
+    data_all = sub_relative{hemis_i}{roi_i};
+    [~, p, ~, stats] = ttest2(data_all(group_idx == 0), data_all(group_idx == 1));
+    fprintf('relative ROI %d: t(%d)=%.3f, p=%.4f\n', roi_i, stats.df, stats.tstat, p);
+end
 
 % ---------- figure ---------- %
 fig_draw = true;
@@ -454,11 +445,11 @@ if fig_draw
             xlim([9 19]); xticks(10:2:18); xlabel('age');
 
             ylabel('relative activation');
-            ylim([-0.1 4.8]); yticks(0:1:4);
+            ylim(relative_ylim); yticks(0:1:4);
 
             set(gca,'XTickLabelRotation',0);
-            set(gca,'LineWidth',0.8);
-            set(gca,'FontName','Arial','FontSize',6, 'FontWeight','bold')
+            set(gca,'LineWidth',0.6);
+            set(gca,'FontName','Arial','FontSize',6, 'FontWeight','normal')
         end
     end
 end
@@ -469,25 +460,20 @@ lme_analysis = true;
 if lme_analysis            
     tmp_beta = arrayfun(@(x) sub_relative{hemis_i}{x}, 1:2, 'uni', 0); % enc-ctrl, all
     tmp_beta = [tmp_beta{1} tmp_beta{2}];
-
     tmp_type = [ones(1, length(group_idx)) ones(1, length(group_idx))*2];
-
     tmp_age = sbj_age; tmp_age = [tmp_age tmp_age];
     tmp_sex = double(sbj_sex); tmp_sex = [tmp_sex tmp_sex];
     tmp_acc = em_acc{6}; tmp_acc = [tmp_acc tmp_acc]; % full EM
     tmp_eti = eti_ea; tmp_eti = [tmp_eti tmp_eti]; % continuous
-
     tmp_sbj = 1:length(group_idx); tmp_sbj = [tmp_sbj tmp_sbj];
-
-    %
-    tmp_names = {'beta', 'subfield', 'age', 'sex', 'acc', 'eti', 'sbj'};
+    tmp_names = {'beta', 'subregion', 'age', 'sex', 'acc', 'eti', 'sbj'};
     tmp_cell = {tmp_beta', tmp_type', tmp_age', tmp_sex', tmp_acc', tmp_eti', tmp_sbj'};
     tmp_array = cell2mat(tmp_cell);
     tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
-    tmp_table.subfield = categorical(tmp_table.subfield);
+    tmp_table.subregion = categorical(tmp_table.subregion);
     
     %
-    lme = fitlme(tmp_table, 'beta~subfield*age*eti+(1|sbj)')
+    lme = fitlme(tmp_table, 'beta~subregion*age*eti+(1|sbj)')
     tbl = anova(lme)
 
     % - print results
@@ -498,129 +484,146 @@ if lme_analysis
             tmp = '* ';
         end
         fprintf('%2s%18s: β=%.3f, SE=%.3f, t(%d)=%.3f, p=%.3f\n', tmp, lme.Coefficients{i,1}, ...
-            lme.Coefficients(i,2), lme.Coefficients(i,3), double(lme.Coefficients(i,5)), lme.Coefficients(i,4), lme.Coefficients(i,6))
+            lme.Coefficients{i,2}, lme.Coefficients{i,3}, double(lme.Coefficients{i,5}), lme.Coefficients{i,4}, lme.Coefficients{i,6})
     end
 end
 
 
 %% peak location: hippocampal activation peak along longitudinal axis (fig. 3e)
 
-roi_idx_L = [ 1 4 5 6 ]; % Hippocampus, head, body, tail
-roi_idx_R = [ 18 21 22 23 ];
-roi_idx_B = [ 35 38 39 40 ];
-HPC_IDX = {roi_idx_L, roi_idx_R, roi_idx_B};
+% ROI indices: big / hbt
+hp_idx = [1 4];
+hbt_idx = [1 2 3; 6 7 8]; % head, body, tail (L/R)
 
-HEMI   = {'L', 'R', 'B'};
-N_HEMI = length(HEMI);
+hemis_label = {'L', 'R', 'B'};
+num_hemis = 2;
 
-PEAK_BW_MM = 8;  % Gaussian smoothing bandwidth (mm)
+peak_bw_mm = 8; % smoothing bandwidth (mm)
 
-peak_pos      = nan(num_sbj, N_HEMI); % normalized AP position via peak voxel (per hemisphere)
-peak_pos_comb = nan(num_sbj, 1);      % bilateral: L+R voxels pooled in normalized [0,1] space
-hpc_len_mm    = nan(num_sbj, N_HEMI); % hippocampal length (mm)
-hpc_nvox      = nan(num_sbj, N_HEMI); % hippocampal voxel count
-peak_beta     = nan(num_sbj, N_HEMI); % Gaussian-smoothed beta value at peak position
+trial_count_enc = nan(1, num_sbj);
+peak_pos = nan(num_sbj, num_hemis);
+peak_pos_comb = nan(num_sbj, 1);
+hpc_len_mm = nan(num_sbj, num_hemis);
+hpc_nvox = nan(num_sbj, num_hemis);
+peak_beta = nan(num_sbj, num_hemis);
 
 for sbj_i = 1:num_sbj
     fprintf('[%d/%d] %s\n', sbj_i, num_sbj, sbj_list{sbj_i});
 
-    %%% load seg
-    seg      = load(fullfile(dir_seg, sprintf('%s.mat', sbj_list{sbj_i})));
-    hdr      = seg.sbj.seg_fit.header;
-    vol_size = hdr.ImageSize;   % [64 64 45]
-    T        = hdr.Transform.T; % 4×4 affine, row-vector convention: mm = [vx,vy,vz,1] * T
+    % load seg
+    seg = load(fullfile(dir_seg, sprintf('%s.mat', sbj_list{sbj_i})));
+    hdr = seg.sbj.seg_fit.header;
+    vol_size = hdr.ImageSize;
+    T = hdr.Transform.T;
 
-    %%% load beta (trial-level, average across all / split A / split B)
-    bdata    = load(fullfile(dir_seg, sprintf('%s.mat', sbj_list{sbj_i})));
+    % load beta
+    bdata = load(fullfile(dir_beta, sprintf('%s.mat', sbj_list{sbj_i})));
     n_trials = length(bdata.glm.beta);
+    trial_count_enc(sbj_i) = sum(arrayfun(@(x) ~isempty(x.enc), bdata.glm.beta));
 
-    beta_all = accumulate_beta(bdata.glm.beta, 1:n_trials,  vol_size);
+    beta_all = zeros(vol_size);
+    trial_count = 0;
+    for trial_i = 1:n_trials
+        tmp_beta = bdata.glm.beta(trial_i).enc_ctrl;
+        if ~isempty(tmp_beta)
+            beta_all = beta_all + double(tmp_beta);
+            trial_count = trial_count + 1;
+        end
+    end
+    if trial_count == 0
+        beta_all = [];
+    else
+        beta_all = beta_all / trial_count;
+    end
     if isempty(beta_all); continue; end
 
-    %%% per hemisphere
-    proj_norm_tmp = {[], []};   % normalized [0,1] projections per hemisphere (L, R)
-    beta_tmp      = {[], []};   % beta values per hemisphere
-    bw_norm_tmp   = [nan, nan]; % normalized bandwidth per hemisphere
-    for h = 1:N_HEMI
-        idx_hpc  = seg.sbj.seg_fit.hpc.big.roi_list_nn{HPC_IDX{h}(1)};
-        idx_head = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(2)};
-        idx_body = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(3)};
-        idx_tail = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{HPC_IDX{h}(4)};
+    % per hemisphere
+    proj_norm_tmp = {[], []};
+    beta_tmp = {[], []};
+    bw_norm_tmp = [nan, nan];
+    for hemis_i = 1:num_hemis
+        idx_hpc = seg.sbj.seg_fit.hpc.big.roi_list_nn{hp_idx(hemis_i)};
+        idx_head = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{hbt_idx(hemis_i, 1)};
+        idx_body = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{hbt_idx(hemis_i, 2)};
+        idx_tail = seg.sbj.seg_fit.hpc.hbt.roi_list_nn{hbt_idx(hemis_i, 3)};
 
         if isempty(idx_hpc) || isempty(idx_head) || isempty(idx_body) || isempty(idx_tail); continue; end
 
-        %%% voxel coords → mm  (row-vector: mm = [vx,vy,vz,1] * T)
-        mm_hpc  = vox2mm(idx_hpc,  vol_size, T);  % N×3
+        % voxel coordinates (mm)
+        mm_hpc = vox2mm(idx_hpc, vol_size, T);
         mm_head = vox2mm(idx_head, vol_size, T);
         mm_tail = vox2mm(idx_tail, vol_size, T);
 
-        %%% PCA → long axis (1st principal component)
+        % long axis (PCA)
         [coeff, ~, ~] = pca(mm_hpc);
-        ax = coeff(:, 1);   % 3×1
-
-        % orient: head (anterior) → tail (posterior)
+        ax = coeff(:, 1);
         if mean(mm_head * ax) > mean(mm_tail * ax)
             ax = -ax;
         end
 
-        all_proj  = mm_hpc * ax;
+        all_proj = mm_hpc * ax;
         head_proj = min(all_proj);
         tail_proj = max(all_proj);
-        ax_range  = tail_proj - head_proj;
-        hpc_len_mm(sbj_i, h) = ax_range;
-        hpc_nvox(sbj_i, h)   = length(idx_hpc);
-
-        %%% store for bilateral combined computation
-        proj_norm_tmp{h} = (mm_hpc * ax - head_proj) / ax_range;  % N_vox×1, [0,1]
-        beta_tmp{h}      = double(beta_all(idx_hpc));
-        bw_norm_tmp(h)   = PEAK_BW_MM / ax_range;
-
-        %%% compute AP position for a given beta volume
-        [peak_pos(sbj_i, h), peak_beta(sbj_i, h)] = ap_peak(beta_all, idx_hpc, mm_hpc, ax, head_proj, ax_range, PEAK_BW_MM);
+        ax_range = tail_proj - head_proj;
+        hpc_len_mm(sbj_i, hemis_i) = ax_range;
+        hpc_nvox(sbj_i, hemis_i) = length(idx_hpc);
+        proj_norm_tmp{hemis_i} = (mm_hpc * ax - head_proj) / ax_range;
+        beta_tmp{hemis_i} = double(beta_all(idx_hpc));
+        bw_norm_tmp(hemis_i) = peak_bw_mm / ax_range;
+        beta_vals = double(beta_all(idx_hpc));
+        proj_vals = mm_hpc * ax;
+        x_eval = linspace(head_proj, head_proj + ax_range, 200);
+        kernel_weight = exp(-0.5 * ((x_eval' - proj_vals') / peak_bw_mm).^2);
+        profile = (kernel_weight * beta_vals) ./ sum(kernel_weight, 2);
+        [peak_beta(sbj_i, hemis_i), peak_idx] = max(profile);
+        peak_pos(sbj_i, hemis_i) = (x_eval(peak_idx) - head_proj) / ax_range;
     end
 
-    %%% bilateral combined: L+R voxels pooled in normalized [0,1] space
+    % bilateral peak
     if ~isempty(proj_norm_tmp{1}) && ~isempty(proj_norm_tmp{2})
         proj_bil = [proj_norm_tmp{1}(:); proj_norm_tmp{2}(:)];
-        beta_bil = [beta_tmp{1}(:);      beta_tmp{2}(:)];
-        bw_bil   = mean(bw_norm_tmp, 'omitnan');
-        peak_pos_comb(sbj_i) = ap_peak_norm(proj_bil, beta_bil, bw_bil);
+        beta_bil = [beta_tmp{1}(:); beta_tmp{2}(:)];
+        bw_bil = mean(bw_norm_tmp, 'omitnan');
+        x_eval = linspace(0, 1, 200);
+        kernel_weight = exp(-0.5 * ((x_eval' - proj_bil(:)') / bw_bil).^2);
+        profile = (kernel_weight * beta_bil(:)) ./ sum(kernel_weight, 2);
+        [~, peak_idx] = max(profile);
+        peak_pos_comb(sbj_i) = x_eval(peak_idx);
     end
 end
 
-% bilateral (column 3): replace per-ROI peak with L+R pooled (combined) peak
+% bilateral
 peak_pos(:, 3) = peak_pos_comb;
 hpc_len_mm = [hpc_len_mm, mean(hpc_len_mm, 2, 'omitnan')];
-hpc_nvox   = [hpc_nvox,   mean(hpc_nvox,   2, 'omitnan')];
-peak_beta  = [peak_beta,  mean(peak_beta,  2, 'omitnan')];
-
+hpc_nvox = [hpc_nvox, mean(hpc_nvox, 2, 'omitnan')];
+peak_beta = [peak_beta, mean(peak_beta, 2, 'omitnan')];
 
 
 %% peak location: figures and stats
 
 
-% ---------- options ---------- %
-ap_data  = peak_pos;  ap_label = 'peak';
-h_plot   = 3;  % 1=L, 2=R, 3=bilateral
+% ---------- parameters ---------- %
+ap_data = peak_pos;  ap_label = 'peak';
+h_plot = 3;  % 1=L, 2=R, 3=bilateral
 
-group_idx    = (eti_ea > 0);
-group_flag   = (eti_ea == 0)';
-group_names  = {'non-abused', 'abused'};
+group_idx = (eti_ea > 0);
+group_flag = (eti_ea == 0)';
+group_names = {'non-abused', 'abused'};
 group_colors = {[0.35 0.35 0.35], [0.78 0.25 0.25]};
 color1 = group_colors{1};
 color2 = group_colors{2};
 
-N_PERM = 5000;
+num_perm = 5000;
 
-% ---------- compute KDE & permutation test ---------- %
-ap     = ap_data(:, h_plot);
-valid  = ~isnan(ap);
+% ---------- density ---------- %
+ap = ap_data(:, h_plot);
+valid = ~isnan(ap);
 x_eval = linspace(0, 1, 300);
 
 g1_valid = valid &  group_flag(:);
 g2_valid = valid & ~group_flag(:);
-ap_g1    = ap(g1_valid);
-ap_g2    = ap(g2_valid);
+ap_g1 = ap(g1_valid);
+ap_g2 = ap(g2_valid);
 
 [~, ~, kde_bw] = ksdensity(ap(valid), x_eval, 'BoundaryCorrection', 'reflection');
 f_g1 = ksdensity(ap_g1, x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
@@ -629,23 +632,23 @@ obs_diff = f_g1 - f_g2;
 
 % permutation
 ap_pooled = ap(g1_valid | g2_valid);
-n1        = sum(g1_valid);
-perm_diff = zeros(N_PERM, length(x_eval));
+n1 = sum(g1_valid);
+perm_diff = zeros(num_perm, length(x_eval));
 rng(42);
-for perm_i = 1:N_PERM
+for perm_i = 1:num_perm
     idx_shuf = randperm(length(ap_pooled));
     fp1 = ksdensity(ap_pooled(idx_shuf(1:n1)),     x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
     fp2 = ksdensity(ap_pooled(idx_shuf(n1+1:end)), x_eval, 'BoundaryCorrection', 'reflection', 'Bandwidth', kde_bw);
     perm_diff(perm_i, :) = fp1 - fp2;
 end
 
-% primary threshold for cluster-based correction (pointwise uncorrected p<.05, two-tailed)
+% pointwise threshold (two-sided p < .05)
 thr_pos_pw = prctile(perm_diff, 97.5, 1);
 thr_neg_pw = prctile(perm_diff,  2.5, 1);
 
-% cluster-based correction (cluster mass = sum of |diff| in cluster)
-max_mass_null = zeros(N_PERM, 1);
-for perm_i = 1:N_PERM
+% cluster mass
+max_mass_null = zeros(num_perm, 1);
+for perm_i = 1:num_perm
     d = perm_diff(perm_i, :);
     for sign_val = [1 -1]
         if sign_val == 1; mask = d > thr_pos_pw;
@@ -659,7 +662,7 @@ for perm_i = 1:N_PERM
 end
 mass_thr = prctile(max_mass_null, 95);
 
-% significant clusters in the observed difference
+% significant clusters
 sig_pos = false(size(obs_diff));
 sig_neg = false(size(obs_diff));
 s = find(diff([false, obs_diff > thr_pos_pw]) == 1);
@@ -680,20 +683,27 @@ end
 sig_pos_sel = sig_pos;
 sig_neg_sel = sig_neg;
 
-% ---------- summary statistics ---------- %
+% ---------- statistics ---------- %
 [~, p_tt, ~, stats_tt] = ttest2(ap_g1, ap_g2);
-fprintf('\n========== AP density group statistics [%s, %s HPC] ==========\n', ap_label, HEMI{h_plot});
+fprintf('\n========== AP density group statistics [%s, %s HPC] ==========\n', ap_label, hemis_label{h_plot});
 fprintf('%-6s  mean=%.3f  std=%.3f  N=%d\n', group_names{1}, mean(ap_g1), std(ap_g1), length(ap_g1));
 fprintf('%-6s  mean=%.3f  std=%.3f  N=%d\n', group_names{2}, mean(ap_g2), std(ap_g2), length(ap_g2));
 fprintf('t-test: t(%.0f)=%.3f  p=%.4f\n', stats_tt.df, stats_tt.tstat, p_tt);
 
 report_range = @(s, x) sprintf('%.3f-%.3f', min(x(s)), max(x(s)));
 fprintf('[correction method: cluster]\n');
-for gi = 1:2
-    if gi == 1; sig_sel = sig_pos_sel; group1 = group_names{1}; group2 = group_names{2};
+for g_i = 1:2
+    if g_i == 1; sig_sel = sig_pos_sel; group1 = group_names{1}; group2 = group_names{2};
     else;        sig_sel = sig_neg_sel; group1 = group_names{2}; group2 = group_names{1}; end
     if any(sig_sel)
         fprintf('%s > %s  (cluster): %s\n', group1, group2, report_range(sig_sel, x_eval));
+        starts = find(diff([false, sig_sel]) == 1);
+        ends = find(diff([sig_sel, false]) == -1);
+        for cluster_i = 1:length(starts)
+            mass = sum(abs(obs_diff(starts(cluster_i):ends(cluster_i))));
+            p_cluster = (sum(max_mass_null >= mass) + 1)/(num_perm + 1);
+            fprintf('cluster %d: corrected p=%.4f\n', cluster_i, p_cluster);
+        end
     end
 end
 if ~any(sig_pos_sel) && ~any(sig_neg_sel)
@@ -701,7 +711,7 @@ if ~any(sig_pos_sel) && ~any(sig_neg_sel)
 end
 
 
-% ---------- plot (density + dots) ---------- %
+% ---------- figure ---------- %
 figure;
 set(gcf, 'Position', [100 100 200 200]);
 
@@ -733,28 +743,28 @@ plot(x_eval, f_g2, 'Color', color2, 'LineWidth', 1.2);
 
 ylabel('Density');
 xlim([0 1]); ylim([0 y_max]);
-set(ax1, 'XTickLabel', {}, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold');
+set(ax1, 'XTickLabel', {}, 'LineWidth', 0.6, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'normal');
 box off;
 
 % - strip -
 ax2 = subplot('Position', [0.16 0.08 0.80 0.17]);
 hold(ax2, 'on');
 
-JITTER = 0.06;
-Y_G1   = 1.5;
-Y_G2   = 0.5;
+dot_jitter = 0.06;
+group_y1 = 1.5;
+group_y2 = 0.5;
 
 rng(1);
-jitter1 = JITTER * randn(length(ap_g1), 1);
-jitter2 = JITTER * randn(length(ap_g2), 1);
-scatter(ap_g1, Y_G1 + jitter1, 6, color1, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
-scatter(ap_g2, Y_G2 + jitter2, 6, color2, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
+jitter1 = dot_jitter * randn(length(ap_g1), 1);
+jitter2 = dot_jitter * randn(length(ap_g2), 1);
+scatter(ap_g1, group_y1 + jitter1, 6, color1, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
+scatter(ap_g2, group_y2 + jitter2, 6, color2, 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
 
-for gi = 1:2
-    if gi == 1; grp_data = ap_g1; color = color1; ym = Y_G1;
-    else;        grp_data = ap_g2; color = color2; ym = Y_G2; end
+for g_i = 1:2
+    if g_i == 1; grp_data = ap_g1; color = color1; ym = group_y1;
+    else;        grp_data = ap_g2; color = color2; ym = group_y2; end
     data_mean = mean(grp_data);
-    data_sem  = std(grp_data) / sqrt(length(grp_data));
+    data_sem = std(grp_data) / sqrt(length(grp_data));
     plot([data_mean-data_sem, data_mean+data_sem], [ym, ym], '-', 'Color', color, 'LineWidth', 1.2);
     plot([data_mean-data_sem, data_mean-data_sem], [ym-0.05, ym+0.05], '-', 'Color', color, 'LineWidth', 1.2);
     plot([data_mean+data_sem, data_mean+data_sem], [ym-0.05, ym+0.05], '-', 'Color', color, 'LineWidth', 1.2);
@@ -763,16 +773,15 @@ end
 
 xlim([0 1]);
 ylim([0.0 2.1]);
-yticks([Y_G2, Y_G1]);
+yticks([group_y2, group_y1]);
 yticklabels({'', ''});
-set(ax2, 'LineWidth', 0.8, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'bold', 'YDir', 'normal');
+set(ax2, 'LineWidth', 0.6, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'normal', 'YDir', 'normal');
 box off;
 
 linkaxes([ax1, ax2], 'x');
 
-
-% ---------- stats ---------- %
-ok   = ~isnan(ap);
+% ---------- statistics ---------- %
+ok = ~isnan(ap);
 idx0 = (group_idx == 0) & ok';
 idx1 = (group_idx == 1) & ok';
 
@@ -782,60 +791,201 @@ fprintf(' AP peak: non-abused = %.3f ± %.3f, abused = %.3f ± %.3f\n', mean(ap(
 fprintf('          - T(%d)=%.3f, p=%.3f\n', stats.df, stats.tstat, p);
 
 
+%% peak location: age correlation and interaction
+% Requires peak_pos from the peak calculation section.
 
-%% ========== Local functions ==========
+h_plot = 3;
+num_boot = 1000;
+plot_color = [0.3 0.3 0.3; 223/255 153/255 153/255];
+peak_ylim = [-0.05 1.05];
 
-function beta_avg = accumulate_beta(beta_struct, trial_idx, vol_size)
-    acc   = zeros(vol_size);
-    count = 0;
-    for t = trial_idx
-        if t > length(beta_struct); continue; end
-        b = beta_struct(t).enc_ctrl;
-        if ~isempty(b)
-            acc   = acc + double(b);
-            count = count + 1;
+ap = peak_pos(:, h_plot);
+group_idx = (eti_ea > 0);
+xvar = sbj_age(:);
+figure;
+set(gcf, 'Position', [100 100 500 130]);
+rng(42);
+for g_i = 0:1
+    ax = subplot(1, 2, g_i+1);
+    ok = (group_idx(:) == g_i) & ~isnan(ap) & ~isnan(xvar);
+    x_reg = xvar(ok); y_reg = ap(ok);
+    [tau, p] = corr(x_reg, y_reg, 'Type', 'Kendall', 'Tail', 'both');
+    xx = linspace(min(x_reg), max(x_reg), 100)';
+    boot_fit = nan(num_boot, length(xx));
+    for boot_i = 1:num_boot
+        idx = randi(length(x_reg), length(x_reg), 1);
+        coef = polyfit(x_reg(idx), y_reg(idx), 1);
+        boot_fit(boot_i, :) = polyval(coef, xx)';
+    end
+    ci = prctile(boot_fit, [2.5 97.5], 1);
+    fill(ax, [xx; flipud(xx)], [ci(1,:)'; flipud(ci(2,:)')], plot_color(g_i+1,:), ...
+        'FaceAlpha', 0.2, 'EdgeColor', 'none'); hold(ax, 'on');
+    scatter(ax, x_reg, y_reg, 6, plot_color(g_i+1,:), 'filled');
+    coef = polyfit(x_reg, y_reg, 1);
+    plot(ax, xx, polyval(coef, xx), 'Color', plot_color(g_i+1,:), 'LineWidth', 1.2);
+    xlim(ax, [9 19]); ylim(ax, peak_ylim);
+    xlabel(ax, 'age'); ylabel(ax, 'AP peak position');
+    set(ax, 'FontName', 'Arial', 'FontSize', 7, 'FontWeight', 'normal', 'LineWidth', 0.6);
+    box(ax, 'off');
+    fprintf('group %d: tau=%.3f, p=%.4f\n', g_i, tau, p);
+end
+
+% ---------- linear model ---------- %
+tmp_names = {'ap', 'age', 'abuse', 'sex'};
+tmp_cell = {ap, sbj_age(:), double(group_idx(:)), double(sbj_sex(:))};
+tmp_array = cell2mat(tmp_cell);
+tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
+lm = fitlm(tmp_table, 'ap~age*abuse')
+lm_sex = fitlm(tmp_table, 'ap~age*abuse+sex')
+
+
+%% hippocampal activation: demographic and psychological factors
+
+roi_idx = 35; % bilateral whole HP
+group_idx = (eti_ea > 0);
+cesd = sbj_svy{ismember(svy_label, 'CES_D')}(:);
+stais = sbj_svy{ismember(svy_label, 'STAI_S')}(:);
+data_all = metric_list_enc{2}{1}{roi_idx}(:);
+factor_list = {cesd >= median(cesd), stais >= median(stais), ...
+    sbj_age(:) >= mean(sbj_age), double(sbj_sex(:))};
+for factor_i = 1:length(factor_list)
+    [p, tbl] = anovan(data_all, {group_idx(:), factor_list{factor_i}}, ...
+        'model', 'interaction', 'display', 'off');
+    fprintf('factor %d: abuse p=%.4f, factor p=%.4f, interaction p=%.4f\n', factor_i, p);
+    disp(tbl);
+end
+
+
+%% hippocampal activation: memory correlation
+
+roi_idx = [35 38 41]; % bilateral HP, anterior, posterior
+acc_idx = [6 5 4]; % full EM, where-when, what-when
+group_idx = (eti_ea > 0);
+for acc_i = acc_idx
+    for roi_i = roi_idx
+        data_all = metric_list_enc{2}{1}{roi_i};
+        for g_i = 0:1
+            [r, p] = corr(em_acc{acc_i}(group_idx == g_i)', data_all(group_idx == g_i)');
+            fprintf('acc %d, %s, group %d: r=%.3f, p=%.4f\n', ...
+                acc_i, roi_name_all{roi_i}, g_i, r, p);
         end
     end
-    if count == 0
-        beta_avg = [];
-    else
-        beta_avg = acc / count;
+end
+
+
+%% retrieval activation and encoding-retrieval similarity
+
+roi_idx = [35 38 41]; % bilateral HP, anterior, posterior
+load(fullfile(dir_metric, sprintf('metric_neural_N%d.mat', num_sbj)), 'metric_list_ret', 'metric_list_act');
+load(fullfile(dir_metric, sprintf('pattern_sim_ERS_N%d.mat', num_sbj)), 'metric_ERS');
+load(fullfile(dir_metric, sprintf('pattern_sim_ERS_enact_N%d.mat', num_sbj)), 'metric_ERS_enact');
+
+data_list = {metric_list_ret{2}{1}, metric_list_act{3}{1}, metric_ERS{7}{1}, metric_ERS_enact{7}{1}};
+data_names = {'imagery activation', 'reenactment activation', 'imagery ERS', 'reenactment ERS'};
+group_idx = (eti_ea > 0);
+bf_rscale = sqrt(2)/2; % JZS; ERS metric 7 = same-trial minus run-matched other-trial
+for data_i = 1:length(data_list)
+    for roi_i = roi_idx
+        data_all = data_list{data_i}{roi_i};
+        non_data = data_all(group_idx == 0);
+        abused_data = data_all(group_idx == 1);
+        [~, p, ~, stats] = ttest2(non_data, abused_data);
+        n_eff = numel(non_data)*numel(abused_data)/(numel(non_data)+numel(abused_data));
+        bf10 = jzs_bf10(stats.tstat, stats.df, n_eff, bf_rscale);
+        fprintf('%s, %s: t(%d)=%.3f, p=%.4f, BF10=%.3f, BF01=%.3f\n', ...
+            data_names{data_i}, roi_name_all{roi_i}, stats.df, stats.tstat, p, bf10, 1/bf10);
     end
 end
 
 
+%% hippocampal volume: ICV correction, group difference and age
+
+volume_index = [1 2 3]; % whole HP, anterior, posterior
+load(fullfile(dir_metric, sprintf('volume_N%d.mat', num_sbj)), 'volume_b', 'volume_icv', 'volume_label');
+group_idx = (eti_ea > 0);
+volume_residual = nan(num_sbj, length(volume_index));
+for roi_i = 1:length(volume_index)
+    mdl = fitlm(volume_icv(:), volume_b(volume_index(roi_i), :)');
+    volume_residual(:, roi_i) = mdl.Residuals.Raw;
+    data_all = volume_residual(:, roi_i);
+    [~, p, ~, stats] = ttest2(data_all(group_idx == 0), data_all(group_idx == 1));
+    fprintf('%s: t(%d)=%.3f, p=%.4f\n', volume_label{volume_index(roi_i)}, stats.df, stats.tstat, p);
+    for g_i = 0:2
+        idx = (group_idx(:) == g_i);
+        if g_i == 2; idx = true(num_sbj, 1); end
+        [r, p] = corr(sbj_age(idx)', data_all(idx));
+        fprintf('group %d: r=%.3f, p=%.4f\n', g_i, r, p);
+    end
+end
+% ---------- Linear mixed-effects model ---------- %
+tmp_names = {'vol', 'subregion', 'age', 'eti', 'sbj'};
+tmp_cell = {reshape(volume_residual(:, 2:3), [], 1), repelem((1:2)', num_sbj), ...
+    repmat(sbj_age(:), 2, 1), repmat(eti_ea(:), 2, 1), repmat((1:num_sbj)', 2, 1)};
+tmp_array = cell2mat(tmp_cell);
+tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
+tmp_table.subregion = categorical(tmp_table.subregion);
+lme = fitlme(tmp_table, 'vol~subregion*age*eti+(1|sbj)')
+anova(lme)
+
+
+%% hippocampal activation: sex and valid-trial sensitivity
+% Requires sub_relative and trial_count_enc from the preceding calculations.
+
+group_idx = (eti_ea > 0);
+for data_i = 1:3
+    if data_i == 1
+        tmp_beta = [metric_list_enc{2}{1}{1}(:); metric_list_enc{2}{1}{18}(:)];
+        model_formula = 'beta~region*eti';
+    elseif data_i == 2
+        tmp_beta = [metric_list_enc{2}{1}{38}(:); metric_list_enc{2}{1}{41}(:)];
+        model_formula = 'beta~region*age*eti';
+    else
+        tmp_beta = [sub_relative{3}{1}(:); sub_relative{3}{2}(:)];
+        model_formula = 'beta~region*age*eti';
+    end
+    tmp_names = {'beta', 'region', 'age', 'eti', 'sex', 'tnum', 'sbj'};
+    tmp_cell = {tmp_beta, repelem((1:2)', num_sbj), repmat(sbj_age(:), 2, 1), ...
+        repmat(eti_ea(:), 2, 1), repmat(double(sbj_sex(:)), 2, 1), ...
+        repmat(trial_count_enc(:), 2, 1), repmat((1:num_sbj)', 2, 1)};
+    tmp_array = cell2mat(tmp_cell);
+    tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
+    tmp_table.region = categorical(tmp_table.region);
+    lme_sex = fitlme(tmp_table, [model_formula '+sex+(1|sbj)'])
+    anova(lme_sex)
+    lme_trials = fitlme(tmp_table, [model_formula '+tnum+(1|sbj)'])
+    anova(lme_trials)
+end
+
+tmp_beta = [metric_list_enc{2}{1}{38}(:); metric_list_enc{2}{1}{41}(:)];
+tmp_names = {'beta', 'region', 'age', 'abuse', 'sex', 'sbj'};
+tmp_cell = {tmp_beta, repelem((1:2)', num_sbj), repmat(sbj_age(:), 2, 1), ...
+    repmat(double(group_idx(:)), 2, 1), repmat(double(sbj_sex(:)), 2, 1), repmat((1:num_sbj)', 2, 1)};
+tmp_array = cell2mat(tmp_cell);
+tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
+tmp_table.region = categorical(tmp_table.region);
+for g_i = 0:1
+    lme_sex = fitlme(tmp_table(tmp_table.abuse == g_i, :), 'beta~region*age+sex+(1|sbj)')
+    anova(lme_sex)
+end
+
+%% local functions
+
 function mm = vox2mm(idx, vol_size, T)
-    % linear voxel indices → mm coordinates (native space)
-    % row-vector convention: mm = [vx,vy,vz,1] * T
     [vx, vy, vz] = ind2sub(vol_size, idx(:));
-    vox_h = [vx, vy, vz, ones(numel(idx), 1)];  % N×4
-    mm    = (vox_h * T);                          % N×4
-    mm    = mm(:, 1:3);                            % N×3
+    vox_h = [vx, vy, vz, ones(numel(idx), 1)];
+    mm = (vox_h * T);
+    mm = mm(:, 1:3);
 end
 
-
-function [pos, peak_val] = ap_peak(beta_vol, idx_hpc, mm_hpc, ax, head_proj, ax_range, bw_mm)
-    % Gaussian-smoothed 1D AP profile → peak position and beta value at peak
-    % bw_mm: smoothing bandwidth (mm), set by PEAK_BW_MM above
-    beta_vals = double(beta_vol(idx_hpc));
-    proj_vals = mm_hpc * ax;          % AP projection per voxel (N×1)
-
-    x_eval  = linspace(head_proj, head_proj + ax_range, 200);  % evaluation points
-    K       = exp(-0.5 * ((x_eval' - proj_vals') / bw_mm).^2); % 200×N
-    profile = (K * beta_vals) ./ sum(K, 2);                    % Gaussian-weighted average
-
-    [peak_val, pk_i] = max(profile);
-    pos = (x_eval(pk_i) - head_proj) / ax_range;
-end
-
-
-function pos = ap_peak_norm(proj_norm_vals, beta_vals, bw_norm)
-    % Gaussian-smoothed peak in pre-normalized [0,1] space
-    % used for bilateral combined peak (L+R voxels pooled after per-hemisphere normalization)
-    % bw_norm: bandwidth in [0,1] units = PEAK_BW_MM / ax_range
-    x_eval  = linspace(0, 1, 200);
-    K       = exp(-0.5 * ((x_eval' - proj_norm_vals(:)') / bw_norm).^2);  % 200×N
-    profile = (K * beta_vals(:)) ./ sum(K, 2);
-    [~, pk_i] = max(profile);
-    pos = x_eval(pk_i);
+function bf10 = jzs_bf10(tstat, df, n_eff, rscale)
+    a = n_eff * rscale^2;
+    
+    integrand = @(z) sqrt(z.^2 ./ (z.^2 + a)) .* ...
+        (1 + (tstat^2 / df) .* z.^2 ./ (z.^2 + a)).^(-(df + 1) / 2) .* ...
+        sqrt(2 / pi) .* exp(-z.^2 / 2);
+    
+    m1 = integral(integrand, 0, Inf);
+    m0 = (1 + tstat^2 / df)^(-(df + 1) / 2);
+    
+    bf10 = m1 / m0;
 end

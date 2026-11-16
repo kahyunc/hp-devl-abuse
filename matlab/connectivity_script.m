@@ -6,7 +6,6 @@
 %% define parameters
 
 IN_PATH_FMRI = 'C:\fMRI_directory'; % directory of fMRI data (nifti)
-IN_PATH_FREESURFER = 'C:\freesurfer_directory'; % directory of FreeSurfer output data
 IN_PATH_REG = 'C:\regressor_directory'; % directory of regressor files
 
 
@@ -19,7 +18,7 @@ reject_run = rejected_run_list;
 
 
 % file list
-t1_list = cellfun(@(x) [IN_PATH_FMRI x '/T1/'], sbj_list, 'uni', 0);
+t1_list = cellfun(@(x) fullfile(IN_PATH_FMRI, x, 'T1'), sbj_list, 'uni', 0);
 func_list = cell(1, num_sbj);
 for sbj_i = 1:num_sbj
     if ~isempty(find(reject_run_sbj == sbj_nums(sbj_i), 1))
@@ -29,7 +28,7 @@ for sbj_i = 1:num_sbj
     end
     func_list{sbj_i} = cell(1, length(run_list));
     for run_i = 1:length(run_list)
-        tmp = [IN_PATH_FMRI sbj_list{sbj_i} '/' num2str(run_list(run_i)) '/f*.nii'];
+        tmp = fullfile(IN_PATH_FMRI, sbj_list{sbj_i}, sprintf('M%d', run_list(run_i)), 'f*.nii');
         func_list{sbj_i}{run_i} = cellstr(conn_dir(tmp));
     end
 end
@@ -42,13 +41,11 @@ TR = 2;
 
 % ROI mask files
 dir_mask = 'C:\mask_directory';
-d = dir(dir_mask); d(1:2) = [];
-mask_names = {d.name}; 
-mask_names = cellfun(@(x) x(2:end-4), mask_names, 'uni', 0);
-mask_paths = arrayfun(@(num) fullfile(d(num).folder, d(num).name), 1:length(d), 'uni', 0);
-
+mask_names = {'B_HPC', 'B_aHPC', 'B_pHPC'}; % AAL; AP split at y = -22 mm
+mask_paths = cellfun(@(x) fullfile(dir_mask, ['r' x '.nii']), mask_names, 'uni', 0);
 
 % condition
+WINDOW_SECONDS = 25; % 25: original; 18: no fixation; 19: no post-encoding extension
 enc_onsets = cell(1, length(sbj_list)); enc_durations = cell(1, length(sbj_list));
 for sbj_i = 1:length(sbj_list)
     curr_sbj = sbj_nums(sbj_i);
@@ -60,7 +57,6 @@ for sbj_i = 1:length(sbj_list)
         run_idx = [1 2 3 4];
     end
     count = 0;
-%     for run_i = 1:run_num
     for run_i = run_idx
         count = count + 1;
         
@@ -68,18 +64,16 @@ for sbj_i = 1:length(sbj_list)
         reg = load(task_reg);
         
         fixenc_i = 2; enc_i = 3;
-        enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
-        enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i} + 6; % hemodynamic delay
-
-        % -- control 1) excluding the pre-encoding fixation
-        % enc_i = 3;
-        % enc_onsets{sbj_i}{count} = reg.onsets{enc_i};
-        % enc_durations{sbj_i}{count} = reg.durations{enc_i} + 6; % hemodynamic delay
-
-        % -- control 2) excluding the post-encoding extension
-        % fixenc_i = 2; enc_i = 3;
-        % enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
-        % enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i};
+        if WINDOW_SECONDS == 18
+            enc_onsets{sbj_i}{count} = reg.onsets{enc_i};
+            enc_durations{sbj_i}{count} = reg.durations{enc_i} + 6;
+        elseif WINDOW_SECONDS == 19
+            enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
+            enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i};
+        else
+            enc_onsets{sbj_i}{count} = reg.onsets{fixenc_i};
+            enc_durations{sbj_i}{count} = reg.onsets{enc_i} - reg.onsets{fixenc_i} + reg.durations{enc_i} + 6;
+        end
 
     end
 end
@@ -91,12 +85,11 @@ global CONN_gui; CONN_gui.usehighres = true; % to fix "usehighres" error
 
 clear batch;
 
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj));
+batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_w%d.mat', num_sbj, WINDOW_SECONDS));
 batch.parallel.N = 3;
 
 batch.Setup.nsubjects = num_sbj;
 batch.Setup.RT = TR;
-
 batch.Setup.functionals = repmat({{}}, [num_sbj, 1]);
 for sbj_i = 1:num_sbj
     for run_i = 1:nsessions(sbj_i)
@@ -120,7 +113,6 @@ batch.Setup.rois.add = 1; %use 1 to define an additional set of ROIs (to be adde
 
 %
 batch.Setup.isnew = 1; % new file
-
 batch.Setup.preprocessing.steps = 'default_mni';
 batch.Setup.preprocessing.sliceorder = 'interleaved (bottom-up)'; % 1-3-5-...-2-4-...
 batch.Setup.done = 1;
@@ -134,14 +126,15 @@ conn_batch(batch);
 
 clear batch;
 
-batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj));
+batch.filename = fullfile('../results/CONN', sprintf('conn_N%d_w%d.mat', num_sbj, WINDOW_SECONDS));
 batch.parallel.N = 4;
 
 % DENOISING
+% WM/CSF and other confounds use CONN defaults.
+batch.Denoising.detrending = 1;
 batch.Denoising.filter = [0.008 Inf]; % high-pass (Hz)
 batch.Denoising.done = 1;
 batch.Denoising.overwrite = 'Yes';
-
 
 % FIRST-LEVEL ANALYSIS
 batch.Analysis.name = 'SBC';
@@ -158,7 +151,7 @@ conn_batch(batch);
 %% CONN display: for 2nd level analysis (GUI)
 
 conn
-conn('load', fullfile('../results/CONN', sprintf('conn_N%d_mni.mat', num_sbj)));
+conn('load', fullfile('../results/CONN', sprintf('conn_N%d_w%d.mat', num_sbj, WINDOW_SECONDS)));
 
 conn gui_results
 

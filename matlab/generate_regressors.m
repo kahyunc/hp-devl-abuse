@@ -41,11 +41,11 @@ for sbj_i = 1:length(sbj_list)
 
     %% extract timing info from raw behavioral data
     
-    trial_types = {'inst_enc_1', 'fix_enc_1', 'enc_1', 'inst_int_1', 'interfere_1', ... % 1~5
-                   'inst_ret_1', 'fix_ret_1', 'ret_1', 'inst_enact_1', 'enact_1', ...   % 6~10
-                   'inst_enc_2', 'fix_enc_2', 'enc_2', 'inst_int_2', 'interfere_2', ...   % 11~15
-                   'inst_ret_2', 'fix_ret_2', 'ret_2', 'inst_enact_2', 'enact_2', ...   % 16~20
-                   'ctrl_inst_enc', 'ctrl_fix_enc', 'ctrl_enc', 'ctrl_inst_ret', 'ctrl_fix_ret', 'ctrl_ret'}; % 21~26
+    trial_types = {'inst_enc_1', 'fix_enc_1', 'enc_1', 'inst_int_1', 'interfere_1', ... 
+                   'inst_ret_1', 'fix_ret_1', 'ret_1', 'inst_enact_1', 'enact_1', ... 
+                   'inst_enc_2', 'fix_enc_2', 'enc_2', 'inst_int_2', 'interfere_2', ... 
+                   'inst_ret_2', 'fix_ret_2', 'ret_2', 'inst_enact_2', 'enact_2', ... 
+                   'ctrl_inst_enc', 'ctrl_fix_enc', 'ctrl_enc', 'ctrl_inst_ret', 'ctrl_fix_ret', 'ctrl_ret'};
     
     tmp = {Data.time.label};
     runIdx = find(ismember(tmp, 'run start'));
@@ -179,6 +179,18 @@ for sbj_i = 1:length(sbj_list)
         names = trial_types_all;
 
         out_file_name = sprintf('%s_run%d_trial.mat', sbj_name, run_i);
+        save(fullfile(OUT_PATH, out_file_name), 'names', 'onsets', 'durations');
+
+        % run regressors for CONN (two experimental trials)
+        names = [regexprep(trial_types_all(1:10), '_1$', ''), trial_types_all(21:26)];
+        onsets = cell(1, 16); durations = cell(1, 16);
+        for phase_i = 1:10
+            onsets{phase_i} = [onsets_all{run_i}{phase_i}(:); onsets_all{run_i}{phase_i+10}(:)];
+            durations{phase_i} = [durations_all{run_i}{phase_i}(:); durations_all{run_i}{phase_i+10}(:)];
+        end
+        onsets(11:16) = onsets_all{run_i}(21:26);
+        durations(11:16) = durations_all{run_i}(21:26);
+        out_file_name = sprintf('%s_run%d.mat', sbj_name, run_i);
         save(fullfile(OUT_PATH, out_file_name), 'names', 'onsets', 'durations');
     end
 

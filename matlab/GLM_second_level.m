@@ -52,15 +52,13 @@ eti_ea = [sbj_eti.EA];
 
 %% run 2nd level: condition contrast
 
-%%%%%%%%%%%%%%%%
 target_con = {'enc-ctrl'};
 
 % group_idx = (1:length(included_sbj)); group_name = '';
-group_idx = (eti_ea == 0); group_name = '_ETIX';
-% group_idx = (eti_ea > 0); group_name = '_ETIO';
+group_idx = (eti_ea == 0); group_name = '_no-EA';
+% group_idx = (eti_ea > 0); group_name = '_EA';
 
 covars = {}; % covariates, e.g. {{'age', sbj_age}, {'sex', double(sbj_sex)}}
-%%%%%%%%%%%%%%%%
 
 excluded_idx = cell2mat(arrayfun(@(num) find(sbj_nums == excluded_sbj(num)), 1:length(excluded_sbj), 'uni', 0));
 sbj_nums(excluded_idx) = [];
@@ -77,13 +75,11 @@ for con_i = 1:length(target_con)
     in_path = fullfile(IN_PATH_FIRST, '_organized');
     file_list = cellfun(@(x) fullfile(in_path, x, sprintf('%s.nii', target_con{con_i})), tmp_sbj, 'uni', 0);
 
-    % check if empty
-    empty_idx = cellfun(@(x) exist(x, 'file'), file_list);
-    file_list(empty_idx == 0) = [];
     in_dir = file_list;
 
     
     %% batch
+    clear matlabbatch
     matlabbatch{1}.spm.stats.factorial_design.dir = {out_dir};
     matlabbatch{1}.spm.stats.factorial_design.des.t1.scans = in_dir(:);
     if isempty(covars)
@@ -115,13 +111,16 @@ for con_i = 1:length(target_con)
     matlabbatch{3}.spm.stats.con.delete = 0;
     
     matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{4}.spm.stats.results.conspec.titlestr = '';
-    matlabbatch{4}.spm.stats.results.conspec.contrasts = 1;
-    matlabbatch{4}.spm.stats.results.conspec.threshdesc = 'FWE';
-    matlabbatch{4}.spm.stats.results.conspec.thresh = 0.05;
-    matlabbatch{4}.spm.stats.results.conspec.extent = 0;
-    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
-    matlabbatch{4}.spm.stats.results.conspec.mask.none = 1;
+    result_contrasts = 1;
+    for result_i = 1:length(result_contrasts)
+        matlabbatch{4}.spm.stats.results.conspec(result_i).titlestr = '';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).contrasts = result_contrasts(result_i);
+        matlabbatch{4}.spm.stats.results.conspec(result_i).threshdesc = 'FWE';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).thresh = 0.05;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).extent = 15;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).conjunction = 1;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).mask.none = 1;
+    end
     matlabbatch{4}.spm.stats.results.units = 1;
     matlabbatch{4}.spm.stats.results.export{1}.ps = true;
     matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
@@ -139,13 +138,11 @@ end
 
 %% run 2nd level: condition contrast - group difference 
 
-%%%%%%%%%%%%%%%%
 target_con = {'enc-ctrl'};
 target_group = {(eti_ea == 0), (eti_ea > 0)}; 
 target_group_name = 'eti';
 
 group_idx = (1:length(included_sbj)); group_name = '';
-%%%%%%%%%%%%%%%%
 
 group_2nd_name = ['group_N', num2str(length(included_sbj))];
 GROUP_OUT_PATH = ['../results/glm_norm_smooth/', group_2nd_name];
@@ -162,6 +159,7 @@ for con_i = 1:length(target_con)
     in_dir2 = cellfun(@(x) fullfile(in_path, x, sprintf('%s.nii', target_con{con_i})), sbj_list(target_group{2} & group_idx), 'uni', 0);
 
     %% batch
+    clear matlabbatch
     matlabbatch{1}.spm.stats.factorial_design.dir = {out_dir};
     
     matlabbatch{1}.spm.stats.factorial_design.des.t2.scans1 = in_dir1(:);
@@ -188,20 +186,26 @@ for con_i = 1:length(target_con)
     matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = '-';
     matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = [1 -1];
     matlabbatch{3}.spm.stats.con.consess{1}.tcon.sessrep = 'none';
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.name = 'abused > non-abused';
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.weights = [-1 1];
+    matlabbatch{3}.spm.stats.con.consess{2}.tcon.sessrep = 'none';
     matlabbatch{3}.spm.stats.con.delete = 0;
     
     matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{4}.spm.stats.results.conspec.titlestr = '';
-    matlabbatch{4}.spm.stats.results.conspec.contrasts = 1;
-    matlabbatch{4}.spm.stats.results.conspec.threshdesc = 'FWE';
-    matlabbatch{4}.spm.stats.results.conspec.thresh = 0.05;
-    matlabbatch{4}.spm.stats.results.conspec.extent = 0;
-    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
-    matlabbatch{4}.spm.stats.results.conspec.mask.none = 1;
+    result_contrasts = [1 2];
+    for result_i = 1:length(result_contrasts)
+        matlabbatch{4}.spm.stats.results.conspec(result_i).titlestr = '';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).contrasts = result_contrasts(result_i);
+        matlabbatch{4}.spm.stats.results.conspec(result_i).threshdesc = 'none';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).thresh = 0.001;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).extent = 15;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).conjunction = 1;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).mask.none = 1;
+    end
     matlabbatch{4}.spm.stats.results.units = 1;
     matlabbatch{4}.spm.stats.results.export{1}.ps = true;
     %
-    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
+    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'unc001_k15';
     
     %% run batch
     batch = matlabbatch;
@@ -216,22 +220,17 @@ end
 
 %% run 2nd level: condition contrast - ANOVA (2-way interaction)
 
-%%%%%%%%%%%%%%%%
 target_con = {'enc-ctrl'};
 
 var1 = double(eti_ea == 0);  var1_name = 'eti';
 var2 = em_acc{4};            var2_name = 'whatw';
-
-group_idx = (1:length(included_sbj)); group_name = '';
-CASE_NUM = '01'; % analysis case identifier (example)
-%%%%%%%%%%%%%%%%
-
 var_list_all = {var1, var2, var1.*var2};
-
 cov_name = {var1_name, var2_name, [var1_name '#' var2_name]};
 cov = cell2mat(var_list_all');
 
-correlation_name = ['anova_N', num2str(length(included_sbj)), '_case', CASE_NUM];
+group_idx = (1:length(included_sbj)); group_name = '';
+
+correlation_name = ['anova_N', num2str(length(included_sbj))];
 CORR_OUT_PATH = ['../results/glm_norm_smooth/', correlation_name];
 if ~exist(CORR_OUT_PATH, 'dir'); mkdir(CORR_OUT_PATH); end
 
@@ -245,9 +244,9 @@ for con_i = 1:length(target_con)
     out_dir = fullfile(CORR_OUT_PATH, target_con{con_i}, sprintf('interaction_%s%s#%s', group_name, var1_name, var2_name));
     if ~exist(out_dir, 'dir'); mkdir(out_dir); end
 
-    corr_sign = 'full';
 
     %% batch
+    clear matlabbatch
     weight_matrix = zeros(1, size(cov,1)+1);
     
     if ~iscell(cov_name)
@@ -282,31 +281,26 @@ for con_i = 1:length(target_con)
     matlabbatch{2}.spm.stats.fmri_est.method.Classical = 1;
     
     matlabbatch{3}.spm.stats.con.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{3}.spm.stats.con.consess{1}.tcon.name = '-';
-    if strcmp(corr_sign, 'pos')
-        tmp_weights = weight_matrix; tmp_weights(2) = 1;
-        matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
-    elseif strcmp(corr_sign, 'neg')
-        tmp_weights = weight_matrix; tmp_weights(2) = -1;
-        matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
-    elseif strcmp(corr_sign, 'full')
-        tmp_weights = weight_matrix; tmp_weights(end) = 1;
-        matlabbatch{3}.spm.stats.con.consess{1}.tcon.weights = tmp_weights;
-    end
-    matlabbatch{3}.spm.stats.con.consess{1}.tcon.sessrep = 'none';
+    matlabbatch{3}.spm.stats.con.consess{1}.fcon.name = 'group-by-whatwhen';
+    tmp_weights = weight_matrix; tmp_weights(end) = 1;
+    matlabbatch{3}.spm.stats.con.consess{1}.fcon.weights = tmp_weights;
+    matlabbatch{3}.spm.stats.con.consess{1}.fcon.sessrep = 'none';
     matlabbatch{3}.spm.stats.con.delete = 0;
     
     matlabbatch{4}.spm.stats.results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    matlabbatch{4}.spm.stats.results.conspec.titlestr = '';
-    matlabbatch{4}.spm.stats.results.conspec.contrasts = 1;
-    matlabbatch{4}.spm.stats.results.conspec.threshdesc = 'FWE';
-    matlabbatch{4}.spm.stats.results.conspec.thresh = 0.05;
-    matlabbatch{4}.spm.stats.results.conspec.extent = 0;
-    matlabbatch{4}.spm.stats.results.conspec.conjunction = 1;
-    matlabbatch{4}.spm.stats.results.conspec.mask.none = 1;
+    result_contrasts = 1;
+    for result_i = 1:length(result_contrasts)
+        matlabbatch{4}.spm.stats.results.conspec(result_i).titlestr = '';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).contrasts = result_contrasts(result_i);
+        matlabbatch{4}.spm.stats.results.conspec(result_i).threshdesc = 'none';
+        matlabbatch{4}.spm.stats.results.conspec(result_i).thresh = 0.001;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).extent = 15;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).conjunction = 1;
+        matlabbatch{4}.spm.stats.results.conspec(result_i).mask.none = 1;
+    end
     matlabbatch{4}.spm.stats.results.units = 1;
     matlabbatch{4}.spm.stats.results.export{1}.ps = true;
-    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'FWE';
+    matlabbatch{4}.spm.stats.results.export{2}.tspm.basename = 'unc001_k15';
         
     %% run batch
     batch = matlabbatch;
@@ -319,18 +313,13 @@ for con_i = 1:length(target_con)
 end
 
 
-
 %% Post-hoc: significant clusters from ANOVA
 
-%%%%%%%%%%%%%%%%
-plot_color = [70 111 156; 160 185 212]./255;  % non-abused vs. abused - whatwhen
+plot_color = [70 111 156; 160 185 212]./255;  % no emotional abuse vs. emotional abuse - whatwhen
 
-group_idx = (eti_ea > 0); group_names = {'non', 'abused'}; group_type = 'ETI EA';
-
+group_idx = (eti_ea > 0); group_names = {'no-EA', 'EA'}; group_type = 'ETI EA';
 beta_name = 'enc-ctrl';
-
 data_behav = em_acc{4};
-%%%%%%%%%%%%%%%%
 
 DIR_BETA = 'C:\GLM_first_level_directory';
 
@@ -350,7 +339,7 @@ for i = 1:length(mask_names)
     roi_idx = find(roi > 0);
     [roi_x, roi_y, roi_z] = ind2sub(size(roi), roi_idx);
     roi_xyz = [roi_x roi_y roi_z]';
-    data = cellfun(@(x) nanmean(spm_get_data(x, roi_xyz), 2), file_list);
+    data = cellfun(@(x) mean(spm_get_data(x, roi_xyz), 2, 'omitnan'), file_list);
 
     %%% - group correlation 
     figure;
@@ -362,20 +351,18 @@ for i = 1:length(mask_names)
     fig_scatter.MarkerFaceColor = plot_color(1, :);
     fig_line = lsline;
     fig_line.LineWidth = 1.2;
-
     mdl = fitlm(reshape(data_behav(group_idx == 0),[],1), reshape(data(group_idx == 0),[],1));
     x = linspace(min(reshape(data_behav(group_idx == 0),[],1)), max(reshape(data_behav(group_idx == 0),[],1)), 1000);
     [y,ci] = predict(mdl,x');
     hold on
     fill([x,flip(x)]', [[ci(:,1)]', flip(ci(:,2))']', [.5 .5 .5],'FaceAlpha',0.2,'linestyle','none'); 
-
     if p<0.05; fig_line.Color=[1 0.5 0.5]; end
     xlim([0 1.05]); xticks(0:0.2:1);
     ylabel('beta coefficient'); yticks(-4:2:4); ylim([-4 4.5]);
     set(gca,'XTickLabelRotation',0);
-    set(gca,'FontName','Helvetica','FontSize',6, 'FontWeight','bold');
-    set(gca,'LineWidth',0.8);
-    fprintf('%8s: non - r=%.3f, p=%.3f', mask_names{i}, r, p);
+    set(gca,'FontName','Arial','FontSize',6, 'FontWeight','normal');
+    set(gca,'LineWidth',0.6);
+    fprintf('%8s: no-EA - r=%.3f, p=%.3f', mask_names{i}, r, p);
 
     subplot(1,11,[7.5 11]);
     [r, p] = corr(reshape(data_behav(group_idx == 1),[],1), reshape(data(group_idx == 1),[],1));
@@ -383,20 +370,18 @@ for i = 1:length(mask_names)
     fig_scatter.MarkerFaceColor = plot_color(2, :);
     fig_line = lsline;
     fig_line.LineWidth = 1.2;
-
     mdl = fitlm(reshape(data_behav(group_idx == 1),[],1), reshape(data(group_idx == 1),[],1));
     x = linspace(min(reshape(data_behav(group_idx == 1),[],1)), max(reshape(data_behav(group_idx == 1),[],1)), 1000);
     [y,ci] = predict(mdl,x');
     hold on
     fill([x,flip(x)]', [[ci(:,1)]', flip(ci(:,2))']', [.5 .5 .5],'FaceAlpha',0.2,'linestyle','none'); 
-
     if p<0.05; fig_line.Color=[1 0.5 0.5]; end
     xlim([0 1.05]); xticks(0:0.2:1);
     ylabel('beta coefficient'); yticks(-4:2:4); ylim([-4 4.5]);
     set(gca,'XTickLabelRotation',0);
-    set(gca,'FontName','Helvetica','FontSize',6, 'FontWeight','bold');
-    set(gca,'LineWidth',0.8);
-    fprintf('\tabused - r=%.3f, p=%.3f\n', r, p);
+    set(gca,'FontName','Arial','FontSize',6, 'FontWeight','normal');
+    set(gca,'LineWidth',0.6);
+    fprintf('\tEA - r=%.3f, p=%.3f\n', r, p);
 end
 disp(' ');
 

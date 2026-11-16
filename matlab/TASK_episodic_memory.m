@@ -1583,7 +1583,7 @@ if isControl && currRun == 4
     Data.time(end).Time = toc(expStart);
     Data.time(end).runTime = toc(runStart);
 
-    allaniAcc = mean(aniAcc); alllocAcc = mean(locAcc); allinterAcc = nanmean(interAcc);
+    allaniAcc = mean(aniAcc); alllocAcc = mean(locAcc); allinterAcc = mean(interAcc, 'omitnan');
     
     fprintf('*** EXPERIMENT END ***\n\n');
     fprintf('Sbj retrieval accuracy: animal - %.3f, location - %.3f\n', allaniAcc, alllocAcc);
