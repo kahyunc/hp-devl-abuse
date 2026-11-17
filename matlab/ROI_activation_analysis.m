@@ -838,6 +838,9 @@ tmp_table = array2table(tmp_array, 'VariableNames', tmp_names);
 lm = fitlm(tmp_table, 'ap~age*abuse')
 lm_sex = fitlm(tmp_table, 'ap~age*abuse+sex')
 
+tmp_table.tnum = trial_count_enc(:);
+lm_trials = fitlm(tmp_table, 'ap~age*abuse+tnum')
+
 
 %% hippocampal activation: demographic and psychological factors
 

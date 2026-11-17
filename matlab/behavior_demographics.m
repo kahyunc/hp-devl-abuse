@@ -19,6 +19,7 @@ sbj_eti = readtable(dir_survey);
 sbj_eti = sbj_eti(sbj_nums, :);
 sbj_eti = table2struct(sbj_eti); % ALL, GT, PA, EA, Q1~21
 eti_ea = [sbj_eti.EA];
+eti_pa = [sbj_eti.PA];
 
 
 %% Participant demographics (No emotional abuse, Emotional abuse)
@@ -78,9 +79,9 @@ sbj_iq = sbj_svy{ismember(svy_label, 'IQ')};
 sbj_stais = sbj_svy{ismember(svy_label, 'STAI_S')};
 sbj_cesd = sbj_svy{ismember(svy_label, 'CES_D')};
 
-sbj_data = {sbj_age', sbj_stais, sbj_cesd, sbj_iq, em_acc{6}', em_acc{5}', em_acc{4}'};
+sbj_data = {sbj_age', sbj_stais, sbj_cesd, sbj_iq, em_acc{6}', em_acc{5}', em_acc{4}', eti_ea(:), eti_pa(:)};
 sbj_data = cell2mat(sbj_data);
-tbl_label = {'age', 'stais', 'cesd', 'iq', 'fullem', 'wherew', 'whatw'};
+tbl_label = {'age', 'stais', 'cesd', 'iq', 'fullem', 'wherew', 'whatw', 'ea', 'pa'};
 sbj_table = array2table(sbj_data, 'VariableNames', tbl_label);
 
 %

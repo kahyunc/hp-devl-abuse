@@ -13,8 +13,8 @@ data_dir = dir(IN_PATH_BHV_RAW); data_dir(1:2) = [];
 tmp_idx = arrayfun(@(num) isfolder(fullfile(data_dir(num).folder, data_dir(num).name)), 1:length(data_dir));
 data_dir(~tmp_idx) = []; 
 
-sbj_date_list = cellfun(@(x) x(1:6), {data_dir.name}, 'UniformOutput', false); sbj_date_list(1) = [];
-sbj_num_list = cellfun(@(x) x(9:11), {data_dir.name}, 'UniformOutput', false); sbj_num_list(1) = [];
+sbj_date_list = cellfun(@(x) x(1:6), {data_dir.name}, 'UniformOutput', false);
+sbj_num_list = cellfun(@(x) x(9:11), {data_dir.name}, 'UniformOutput', false);
 sbj_num_array = cellfun(@(x) str2double(x), sbj_num_list);
 
 d = dir(IN_PATH_BHV);
